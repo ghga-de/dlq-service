@@ -19,14 +19,13 @@ import asyncio
 
 from ghga_service_commons.api import run_server
 
-from .api.main import app  # noqa: F401 pylint: disable=unused-import
+from .api.main import app  # noqa: F401
 from .config import CONFIG, Config
 
 
 def run(config: Config = CONFIG):
     """Run the service."""
-    # Please adapt to package name
-    asyncio.run(run_server(app="my_microservice.__main__:app", config=config))
+    asyncio.run(run_server(app="dlqs.__main__:app", config=config))
 
 
 if __name__ == "__main__":
