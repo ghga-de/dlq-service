@@ -13,17 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entrypoint of the package."""
+"""Outbound port for sending events to the 'retry' topics."""
 
-import asyncio
+from abc import ABC, abstractmethod
 
-from dlqs.main import run_rest_app
-
-
-def run():
-    """Run the service."""
-    asyncio.run(run_rest_app())
+from dlqs.models import EventInfo
 
 
-if __name__ == "__main__":
-    run()
+class RetryPublisherPort(ABC):
+    """Port for an event publisher that sends events to the 'retry' topics"""
+
+    @abstractmethod
+    async def send_to_retry_topic(self, *, event: EventInfo, retry_topic: str) -> None:
+        """Publish the given event to the appropriate 'retry' topic"""
+        ...

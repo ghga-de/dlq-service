@@ -1,5 +1,294 @@
+components:
+  schemas:
+    DLQConfig:
+      additionalProperties: false
+      description: Configuration for the various DLQ topics managed by this service.
+      properties:
+        services:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          description: A dictionary where the keys are abbreviated service names and
+            the values are the list of topics that service subscribes to. The topic
+            names must match the configured values rather than the field names used
+            by the service code.
+          examples:
+          - dcs:
+            - file-downloads
+            - internal-file-registry
+            - file-deletions
+            ns: notifications
+          title: Services
+          type: object
+      required:
+      - services
+      title: DLQConfig
+      type: object
+    EventInfo:
+      description: Model representing GHGA-internal event info
+      properties:
+        headers:
+          additionalProperties:
+            type: string
+          description: Any headers for the event. Must at least include correlation
+            ID.
+          title: Headers
+          type: object
+        key:
+          description: The key of the event.
+          title: Key
+          type: string
+        payload:
+          description: The payload for the event.
+          title: Payload
+          type: object
+        topic:
+          description: The name of the original topic the event was located in.
+          title: Topic
+          type: string
+        type_:
+          description: The 'type' given to the original event.
+          title: Type
+          type: string
+      required:
+      - topic
+      - type_
+      - payload
+      - key
+      - headers
+      title: EventInfo
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
 info:
-  title: FastAPI
+  description: A service to manage the dead letter queue for Kafka events
+  title: DLQ Service
   version: 0.1.0
 openapi: 3.1.0
-paths: {}
+paths:
+  /health:
+    get:
+      description: Used to test if this service is alive
+      operationId: health_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: health
+  /services:
+    get:
+      description: 'Return the configured service abbreviations, each with a list
+        of topics that
+
+        the service subscribes to.'
+      operationId: get_config_services_get
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DLQConfig'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                title: Response Get Config Services Get
+                type: object
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Retrieve the configured services and the topics they subscribe to as
+        a dict
+  /{service}/{topic}:
+    delete:
+      description: Process the next event in the topic, optionally publishing the
+        supplied event
+      operationId: discard_event__service___topic__delete
+      parameters:
+      - in: path
+        name: service
+        required: true
+        schema:
+          title: Service
+          type: string
+      - in: path
+        name: topic
+        required: true
+        schema:
+          title: Topic
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Discard Event
+    get:
+      description: 'Return the next events in the topic.
+
+
+        This is a preview of the events and does not impact event ordering within
+        the DLQ.'
+      operationId: get_events__service___topic__get
+      parameters:
+      - in: path
+        name: service
+        required: true
+        schema:
+          title: Service
+          type: string
+      - in: path
+        name: topic
+        required: true
+        schema:
+          title: Topic
+          type: string
+      - in: query
+        name: limit
+        required: true
+        schema:
+          title: Limit
+          type: integer
+      - in: query
+        name: skip
+        required: true
+        schema:
+          title: Skip
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EventInfo'
+                title: Response Get Events  Service   Topic  Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Return the next events in the topic
+    post:
+      description: Process the next event in the topic, optionally publishing the
+        supplied event
+      operationId: process_event__service___topic__post
+      parameters:
+      - in: path
+        name: service
+        required: true
+        schema:
+          title: Service
+          type: string
+      - in: path
+        name: topic
+        required: true
+        schema:
+          title: Topic
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/EventInfo'
+              - type: 'null'
+              title: Override
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Process Event
+  /{service}/{topic}/test:
+    post:
+      description: Process the next event in the topic, optionally publishing the
+        supplied event
+      operationId: process_event_dry_run__service___topic__test_post
+      parameters:
+      - in: path
+        name: service
+        required: true
+        schema:
+          title: Service
+          type: string
+      - in: path
+        name: topic
+        required: true
+        schema:
+          title: Topic
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/EventInfo'
+              - type: 'null'
+              title: Override
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Process Event Dry Run
+servers:
+- url: ''

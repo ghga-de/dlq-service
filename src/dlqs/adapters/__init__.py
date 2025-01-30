@@ -13,17 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entrypoint of the package."""
-
-import asyncio
-
-from dlqs.main import run_rest_app
-
-
-def run():
-    """Run the service."""
-    asyncio.run(run_rest_app())
-
-
-if __name__ == "__main__":
-    run()
+"""Inbound and outbound adapters (port implementations) for the DLQ service"""

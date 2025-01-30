@@ -13,17 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Module containing the main FastAPI router and (optionally) top-level API endpoints.
-
-Additional endpoints might be structured in dedicated modules
-(each of them having a sub-router).
-"""
-
-from fastapi import FastAPI
-from ghga_service_commons.api import configure_app
-
-from dlqs.config import CONFIG
-
-app = FastAPI()
-configure_app(app, config=CONFIG)
+"""Inbound and outbound ports for the DLQ service"""

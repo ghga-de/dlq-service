@@ -16,15 +16,29 @@
 """Config Parameter Modeling and Parsing."""
 
 from ghga_service_commons.api import ApiConfigBase
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
 from hexkit.config import config_from_yaml
 from hexkit.log import LoggingConfig
-from pydantic import Field
+from hexkit.providers.akafka.config import KafkaConfig
+from hexkit.providers.mongodb import MongoDbConfig
+
+
+class DLQConfig(BaseSettings):
+    """Configuration for the various DLQ topics managed by this service."""
+
+    events_collection: str = Field(
+        "dlqEvents",
+        description="The name of the MongoDB collection where DLQ events are stored.",
+    )
+
 
 SERVICE_NAME: str = "dlqs"
 
 
 @config_from_yaml(prefix=SERVICE_NAME)
-class Config(ApiConfigBase, LoggingConfig):
+class Config(ApiConfigBase, LoggingConfig, KafkaConfig, DLQConfig, MongoDbConfig):
     """Config parameters and their defaults."""
 
     service_name: str = Field(

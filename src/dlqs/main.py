@@ -13,17 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entrypoint of the package."""
+"""
+Module containing the main FastAPI router and (optionally) top-level API endpoints.
 
-import asyncio
+Additional endpoints might be structured in dedicated modules
+(each of them having a sub-router).
+"""
 
-from dlqs.main import run_rest_app
+from ghga_service_commons.api import run_server
+
+from dlqs.config import Config
+from dlqs.inject import prepare_rest_app
+from hexkit.log import configure_logging
 
 
-def run():
-    """Run the service."""
-    asyncio.run(run_rest_app())
+async def run_rest_app():
+    """Run the HTTP REST API."""
+    config = Config()  # type: ignore [call-arg]
+    configure_logging(config=config)
 
-
-if __name__ == "__main__":
-    run()
+    async with prepare_rest_app(config=config) as app:
+        await run_server(app=app, config=config)

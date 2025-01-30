@@ -12,18 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Pytest setup"""
 
-"""Entrypoint of the package."""
-
-import asyncio
-
-from dlqs.main import run_rest_app
-
-
-def run():
-    """Run the service."""
-    asyncio.run(run_rest_app())
-
-
-if __name__ == "__main__":
-    run()
+from hexkit.providers.akafka.testutils import (  # noqa: F401
+    kafka_container_fixture,
+    kafka_fixture,
+)
+from hexkit.providers.mongodb.testutils import (  # noqa: F401
+    mongodb_container_fixture,
+    mongodb_fixture,
+)
+from tests.fixtures.joint import joint_fixture  # noqa: F401
