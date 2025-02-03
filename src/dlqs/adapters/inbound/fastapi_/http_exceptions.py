@@ -48,8 +48,11 @@ class HttpPreviewParamsError(HttpCustomExceptionBase):
         """Construct message and init the exception."""
         super().__init__(
             status_code=status_code,
-            description="Invalid values for `skip` or `limit`.",
-            data={skip: skip, limit: limit},
+            description=(
+                "Invalid values for `skip` and/or `limit`. Skip must be >=0 if supplied"
+                + " and limit must be >=1 if supplied."
+            ),
+            data={"skip": skip, "limit": limit},
         )
 
 

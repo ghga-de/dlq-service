@@ -14,3 +14,36 @@
 # limitations under the License.
 
 """REST API-focused unit tests for the  that mock the DlqManager"""
+
+from unittest.mock import AsyncMock
+
+import pytest
+from ghga_service_commons.api.testing import AsyncTestClient
+
+from dlqs.inject import prepare_rest_app
+from tests.fixtures import utils
+from tests.fixtures.config import DEFAULT_CONFIG
+
+
+@pytest.mark.asyncio
+async def test_preview_bad_params():
+    """Test how ValueError is translated (from bad `skip` or `limit` args)"""
+    dlq_manager = AsyncMock()
+    dlq_manager.preview_events.side_effect = ValueError("bad params")
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=dlq_manager,
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.get(f"/{utils.UFS}/{utils.USER_EVENTS}?skip=-1&limit=0")
+        assert response.status_code == 400
+        assert response.json() == {
+            "description": (
+                "Invalid values for `skip` and/or `limit`. Skip must be >=0 if supplied"
+                + " and limit must be >=1 if supplied."
+            ),
+            "data": {"skip": -1, "limit": 0},
+            "exception_id": "previewParamsError",
+        }
