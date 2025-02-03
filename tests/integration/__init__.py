@@ -13,4 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests that incorporate multiple components at once"""
+"""Integration tests that incorporate multiple components at once.
+
+There are two made-up services, the User File Service (UFS) and the File
+Storage Service (FSS). There are also three topics: notifications, user-events,
+and graph-updates. Both the UFS and FSS subscribe to the user-events, but only the UFS
+subscribes to the notifications topic and only the FSS subscribes to the graph updates.
+"""

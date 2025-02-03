@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter, status
 
-from dlqs.adapters.inbound.fastapi_.dummies import (
-    DLQConfigDependency,
-    DLQManagerDependency,
+from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDependency
+from dlqs.adapters.inbound.fastapi_.http_exceptions import (
+    HttpDiscardError,
+    HttpInternalServerError,
+    HttpOverrideValidationError,
+    HttpPreviewParamsError,
 )
 from dlqs.models import EventInfo
 
@@ -22,38 +25,30 @@ async def health():
 
 
 @router.get(
-    "/services",
-    summary="Retrieve the configured services and the topics they subscribe to as a dict",
-    status_code=status.HTTP_200_OK,
-    response_model=dict[str, list[str]],
-)
-async def get_config(dlq_config: DLQConfigDependency):
-    """Return the configured service abbreviations, each with a list of topics that
-    the service subscribes to.
-    """
-    return dlq_config
-
-
-@router.get(
     "/{service}/{topic}",
     summary="Return the next events in the topic",
     status_code=status.HTTP_200_OK,
 )
 async def get_events(
+    dlq_manager: DLQManagerDependency,
     service: str,
     topic: str,
-    limit: int,
-    skip: int,
-    dlq_manager: DLQManagerDependency,
+    skip: int = 0,
+    limit: int | None = None,
 ) -> list[EventInfo]:
     """Return the next events in the topic.
 
     This is a preview of the events and does not impact event ordering within the DLQ.
     """
-    # TODO: error checking
-    return await dlq_manager.preview_events(
-        service=service, topic=topic, limit=limit, skip=skip
-    )
+    try:
+        return await dlq_manager.preview_events(
+            service=service, topic=topic, limit=limit, skip=skip
+        )
+    except ValueError as err:
+        raise HttpPreviewParamsError(skip=skip, limit=limit) from err
+    except Exception as exc:
+        # DLQPreviewError and all others get caught here
+        raise HttpInternalServerError() from exc
 
 
 @router.post(
@@ -65,31 +60,18 @@ async def process_event(
     topic: str,
     dlq_manager: DLQManagerDependency,
     override: EventInfo | None = None,
+    dry_run: bool = False,
 ) -> None:
     """Process the next event in the topic, optionally publishing the supplied event"""
-    # TODO: error checking
-    await dlq_manager.process_event(
-        service=service, topic=topic, override=override, dry_run=False
-    )
-
-
-@router.post(
-    "/{service}/{topic}/test",
-    status_code=status.HTTP_200_OK,
-)
-async def process_event_dry_run(
-    service: str,
-    topic: str,
-    dlq_manager: DLQManagerDependency,
-    override: EventInfo | None = None,
-) -> EventInfo | None:
-    """Process the next event in the topic, optionally publishing the supplied event"""
-    # TODO: error checking
-    result = await dlq_manager.process_event(
-        service=service, topic=topic, override=override, dry_run=True
-    )
-
-    return result
+    try:
+        await dlq_manager.process_event(
+            service=service, topic=topic, override=override, dry_run=dry_run
+        )
+    except dlq_manager.DLQValidationError as err:
+        raise HttpOverrideValidationError(event=override, reason=str(err)) from err
+    except Exception as exc:
+        # lump all other errors here
+        raise HttpInternalServerError() from exc
 
 
 @router.delete(
@@ -100,5 +82,10 @@ async def discard_event(
     service: str, topic: str, dlq_manager: DLQManagerDependency
 ) -> None:
     """Process the next event in the topic, optionally publishing the supplied event"""
-    # TODO: error checking
-    return await dlq_manager.discard_event(service=service, topic=topic)
+    try:
+        return await dlq_manager.discard_event(service=service, topic=topic)
+    except dlq_manager.DLQDeletionError as err:
+        raise HttpDiscardError() from err
+    except Exception as exc:
+        # lump all other errors here
+        raise HttpInternalServerError() from exc

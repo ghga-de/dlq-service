@@ -1,30 +1,5 @@
 components:
   schemas:
-    DLQConfig:
-      additionalProperties: false
-      description: Configuration for the various DLQ topics managed by this service.
-      properties:
-        services:
-          additionalProperties:
-            items:
-              type: string
-            type: array
-          description: A dictionary where the keys are abbreviated service names and
-            the values are the list of topics that service subscribes to. The topic
-            names must match the configured values rather than the field names used
-            by the service code.
-          examples:
-          - dcs:
-            - file-downloads
-            - internal-file-registry
-            - file-deletions
-            ns: notifications
-          title: Services
-          type: object
-      required:
-      - services
-      title: DLQConfig
-      type: object
     EventInfo:
       description: Model representing GHGA-internal event info
       properties:
@@ -43,6 +18,11 @@ components:
           description: The payload for the event.
           title: Payload
           type: object
+        timestamp:
+          description: The timestamp of the event.
+          format: date-time
+          title: Timestamp
+          type: string
         topic:
           description: The name of the original topic the event was located in.
           title: Topic
@@ -106,39 +86,6 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
-  /services:
-    get:
-      description: 'Return the configured service abbreviations, each with a list
-        of topics that
-
-        the service subscribes to.'
-      operationId: get_config_services_get
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DLQConfig'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                additionalProperties:
-                  items:
-                    type: string
-                  type: array
-                title: Response Get Config Services Get
-                type: object
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Retrieve the configured services and the topics they subscribe to as
-        a dict
   /{service}/{topic}:
     delete:
       description: Process the next event in the topic, optionally publishing the
@@ -188,17 +135,20 @@ paths:
           title: Topic
           type: string
       - in: query
-        name: limit
-        required: true
-        schema:
-          title: Limit
-          type: integer
-      - in: query
         name: skip
-        required: true
+        required: false
         schema:
+          default: 0
           title: Skip
           type: integer
+      - in: query
+        name: limit
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
       responses:
         '200':
           content:
@@ -233,6 +183,13 @@ paths:
         schema:
           title: Topic
           type: string
+      - in: query
+        name: dry_run
+        required: false
+        schema:
+          default: false
+          title: Dry Run
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -251,44 +208,5 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Process Event
-  /{service}/{topic}/test:
-    post:
-      description: Process the next event in the topic, optionally publishing the
-        supplied event
-      operationId: process_event_dry_run__service___topic__test_post
-      parameters:
-      - in: path
-        name: service
-        required: true
-        schema:
-          title: Service
-          type: string
-      - in: path
-        name: topic
-        required: true
-        schema:
-          title: Topic
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              anyOf:
-              - $ref: '#/components/schemas/EventInfo'
-              - type: 'null'
-              title: Override
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Process Event Dry Run
 servers:
 - url: ''

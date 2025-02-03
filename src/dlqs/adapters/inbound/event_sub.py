@@ -17,10 +17,11 @@
 from collections.abc import Mapping
 from datetime import datetime
 
-from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 from hexkit.custom_types import Ascii, JsonObject
 from hexkit.protocols.eventsub import DLQSubscriberProtocol
-from hexkit.providers.akafka.provider.eventsub import DLQEventInfo
+
+from dlqs.models import EventInfo
+from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 
 
 class DLQSubTranslator(DLQSubscriberProtocol):
@@ -38,15 +39,15 @@ class DLQSubTranslator(DLQSubscriberProtocol):
         topic: Ascii,
         key: Ascii,
         timestamp: datetime,
-        headers: Mapping[Ascii, Ascii],
+        headers: Mapping[str, str],
     ) -> None:
         """Consume an event"""
-        event = DLQEventInfo(
-            payload=payload,
+        event = EventInfo(
+            payload=payload,  # type: ignore
             type_=type_,
             topic=topic,
             key=key,
             timestamp=timestamp,
-            headers=headers,
+            headers=headers,  # type: ignore
         )
         await self.dlq_manager.store_event(event=event)

@@ -16,8 +16,9 @@
 
 from abc import ABC, abstractmethod
 
-from dlqs.models import StoredDLQEvent
 from hexkit.protocols.dao import Dao
+
+from dlqs.models import StoredDLQEvent
 
 EventDaoPort = Dao[StoredDLQEvent]
 
@@ -34,7 +35,7 @@ class AggregatorPort(ABC):
 
     @abstractmethod
     async def aggregate(
-        self, *, service: str, topic: str, skip: int, limit: int
+        self, *, service: str, topic: str, skip: int = 0, limit: int | None = None
     ) -> list[StoredDLQEvent]:
         """Aggregate events from the DLQ by service and topic.
 

@@ -17,14 +17,9 @@
 
 from typing import Literal
 
-from dlqs.models import EventInfo
-from hexkit.providers.akafka.provider.eventsub import (
-    CORRELATION_ID_FIELD,
-    EVENT_ID_FIELD,
-    EXC_CLASS_FIELD,
-    EXC_MSG_FIELD,
-    ORIGINAL_TOPIC_FIELD,
-)
+from hexkit.providers.akafka.provider.eventsub import ExtractedEventInfo, HeaderNames
+
+from dlqs.models import EventInfo, StoredDLQEvent
 from tests.fixtures.config import DEFAULT_CONFIG
 
 # Service names
@@ -35,60 +30,87 @@ FSS = "fss"
 NOTIFICATIONS = "notifications"
 USER_EVENTS = "user-events"
 GRAPH_UPDATES = "graph-updates"
-DlqOrRetry = Literal["dlq", "retry"]
+EventLocation = Literal["dlq", "retry"]
 TEST_CID = "387a028c-a272-4086-b930-6d3e3c389d51"
 
 
-def get_user_event(
-    *,
-    service: Literal["ufs", "fss"],
-    target: DlqOrRetry,
-    user_id: str,
-) -> EventInfo:
-    """Generate an event for the user-events topic, either for retry or dlq
+def dlq_to_db(event: EventInfo) -> StoredDLQEvent:
+    """Convert an EventInfo instance to a StoredDLQEvent instance.
+
+    This performs the transformation that occurs when storing a DLQ event in the DB.
+    """
+    event_id = event.headers[HeaderNames.EVENT_ID]
+    service = event_id.split(",")[0]
+    db_event = StoredDLQEvent(
+        service=service,
+        event_id=event_id,
+        topic=event.headers[HeaderNames.ORIGINAL_TOPIC],
+        type_=event.type_,
+        payload=event.payload,
+        key=event.key,
+        timestamp=event.timestamp,
+        headers=event.headers,
+    )
+    return db_event
+
+
+def db_to_retry(event: StoredDLQEvent) -> ExtractedEventInfo:
+    """Convert a StoredDLQEvent instance to an ExtractedEventInfo instance.
+
+    This performs the transformation that occurs when publishing an event from
+    the database to a retry topic.
+    """
+    retry_event = ExtractedEventInfo(
+        topic=event.service + "-retry",
+        type_=event.type_,
+        payload=event.payload,
+        key=event.key,
+        headers={HeaderNames.ORIGINAL_TOPIC: event.headers[HeaderNames.ORIGINAL_TOPIC]},
+    )
+    return retry_event
+
+
+def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> EventInfo:
+    """Generate a DLQ event for the user-events topic.
 
     Works with either the UFS (user feed service) or the FSS (friend suggestion service)
     """
-    topic = DEFAULT_CONFIG.kafka_dlq_topic if target == "dlq" else f"{service}-retry"
-    headers = {ORIGINAL_TOPIC_FIELD: USER_EVENTS}
-    if target == "dlq":
-        headers[EVENT_ID_FIELD] = f"{service},{USER_EVENTS},0,370"
-        headers[EXC_CLASS_FIELD] = "ResourceAlreadyExistsError"
-        headers[EXC_MSG_FIELD] = f'The resource with the id "{user_id}" already exists.'
-        headers[CORRELATION_ID_FIELD] = TEST_CID
+    user_id = f"user_id{offset}"
+    headers = {
+        HeaderNames.ORIGINAL_TOPIC: USER_EVENTS,
+        HeaderNames.EVENT_ID: f"{service},{USER_EVENTS},0,{offset}",
+        HeaderNames.EXC_CLASS: "ResourceAlreadyExistsError",
+        HeaderNames.EXC_MSG: f'The resource with the id "{user_id}" already exists.',
+        HeaderNames.CORRELATION_ID: TEST_CID,
+    }
 
     dlq_user_event = EventInfo(
-        topic=topic,
-        payload={"user_id": user_id, "name": "John Doe"},
+        topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="registration",
+        payload={"user_id": user_id, "name": "John Doe"},
         key=user_id,
         headers=headers,
     )
     return dlq_user_event
 
 
-def get_notifications_event(
-    *,
-    target: DlqOrRetry,
-    user_id1: str,
-    user_id2: str,
-) -> EventInfo:
-    """Generate an event for the notifications topic, either for retry or dlq.
+def notifications_event(*, offset: int = 0) -> EventInfo:
+    """Generate a DLQ event for the notifications topic.
 
     Only for the UFS (user feed service).
     """
-    topic = DEFAULT_CONFIG.kafka_dlq_topic if target == "dlq" else "ufs-retry"
-    headers = {ORIGINAL_TOPIC_FIELD: NOTIFICATIONS}
-    if target == "dlq":
-        headers[EVENT_ID_FIELD] = f"{UFS}{NOTIFICATIONS},1,164"
-        headers[EXC_CLASS_FIELD] = "ResourceNotFoundError"
-        headers[EXC_MSG_FIELD] = (
-            f'The resource with the id "{user_id2}" does not exist.'
-        )
-        headers[CORRELATION_ID_FIELD] = TEST_CID
+    user_id1 = f"user_id{offset}"
+    user_id2 = f"user_id{offset + 1}"
+    headers = {
+        HeaderNames.ORIGINAL_TOPIC: NOTIFICATIONS,
+        HeaderNames.EVENT_ID: f"{UFS},{NOTIFICATIONS},0,{offset}",
+        HeaderNames.EXC_CLASS: "ResourceNotFoundError",
+        HeaderNames.EXC_MSG: f'The resource with the id "{user_id2}" does not exist.',
+        HeaderNames.CORRELATION_ID: TEST_CID,
+    }
 
     notifications_event = EventInfo(
-        topic=topic,
+        topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="tagged_in_photo",
         payload={
             "photo_id": "76dc2b15-38e5-4e67-9ee9-7da031d7fc45",
@@ -102,31 +124,26 @@ def get_notifications_event(
     return notifications_event
 
 
-def get_graph_event(
-    *,
-    target: DlqOrRetry,
-    user_id1: str,
-    user_id2: str,
-) -> EventInfo:
-    """Generate an event for the graph-updates topic, either for retry or dlq.
+def graph_event(*, offset: int = 0) -> EventInfo:
+    """Generate a DLQ event for the graph-updates topic.
 
     Only for the FSS (friend suggestion service).
     """
-    topic = DEFAULT_CONFIG.kafka_dlq_topic if target == "dlq" else "fss-retry"
-    headers = {ORIGINAL_TOPIC_FIELD: GRAPH_UPDATES}
-    if target == "dlq":
-        headers[EVENT_ID_FIELD] = f"{FSS},{GRAPH_UPDATES},0,842"
-        headers[EXC_CLASS_FIELD] = "ResourceNotFoundError"
-        headers[EXC_MSG_FIELD] = (
-            f'The resource with the id "{user_id2}" does not exist.'
-        )
-        headers[CORRELATION_ID_FIELD] = TEST_CID
+    user_id1 = f"user_id{offset}"
+    user_id2 = f"user_id{offset + 1}"
+    headers = {
+        HeaderNames.ORIGINAL_TOPIC: GRAPH_UPDATES,
+        HeaderNames.EVENT_ID: f"{FSS},{GRAPH_UPDATES},0,{offset}",
+        HeaderNames.EXC_CLASS: "ResourceNotFoundError",
+        HeaderNames.EXC_MSG: f'The resource with the id "{user_id2}" does not exist.',
+        HeaderNames.CORRELATION_ID: TEST_CID,
+    }
 
     graph_event = EventInfo(
-        topic=topic,
+        topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="connection_added",
-        key=user_id1,
         payload={"source_id": user_id1, "dest_id": user_id2},
+        key=user_id1,
         headers=headers,
     )
     return graph_event

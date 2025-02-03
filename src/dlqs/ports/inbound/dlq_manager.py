@@ -14,15 +14,12 @@
 # limitations under the License.
 """DLQ Manager Port definition"""
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from dlqs.models import EventInfo
-from hexkit.providers.akafka.provider.eventsub import (
-    DLQEventInfo,
-)
 
 
-class DLQManagerPort:
+class DLQManagerPort(ABC):
     """Manager for the Dead Letter Queue (DLQ) service"""
 
     class NotConfiguredError(RuntimeError):
@@ -78,7 +75,7 @@ class DLQManagerPort:
             super().__init__(msg)
 
     @abstractmethod
-    async def store_event(self, *, event: DLQEventInfo) -> None:
+    async def store_event(self, *, event: EventInfo) -> None:
         """Store an event in the database with its service name and event ID.
 
         Raises a `DLQInsertionError` if the insertion fails.
@@ -91,18 +88,20 @@ class DLQManagerPort:
         *,
         service: str,
         topic: str,
-        skip: int,
-        limit: int,
+        skip: int = 0,
+        limit: int | None = None,
     ) -> list[EventInfo]:
         """Return a list of the next DLQ events for the given `service` and `topic`.
 
         Args:
         - `service`: The name of the service to preview events for.
         - `topic`: The name of the topic to preview.
-        - `skip`: The number of events to skip for pagination.
-        - `limit`: The maximum number of events to return for pagination.
+        - `skip`: The number of events to skip for pagination. Default is 0.
+        - `limit`: The maximum number of events to return. Default is 0 (no limit).
 
-        Raises a `DLQPreviewError` if the preview fails.
+        Raises:
+        - `ValueError` if there is a problem with the params supplied to the aggregator.
+        - `DLQPreviewError` if the preview fails during the aggregation
         """
         ...
 

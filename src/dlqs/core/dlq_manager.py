@@ -17,27 +17,33 @@
 
 import logging
 
+from hexkit.correlation import set_correlation_id
+from hexkit.protocols.dao import ResourceAlreadyExistsError
+from hexkit.providers.akafka.provider.eventsub import HeaderNames
+
 from dlqs.config import Config
 from dlqs.models import EventInfo, StoredDLQEvent
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 from dlqs.ports.outbound.dao import AggregatorPort, EventDaoPort
 from dlqs.ports.outbound.event_pub import RetryPublisherPort
-from hexkit.correlation import set_correlation_id
-from hexkit.protocols.dao import ResourceAlreadyExistsError
-from hexkit.providers.akafka.provider.eventsub import (
-    EVENT_ID_FIELD,
-    ORIGINAL_TOPIC_FIELD,
-)
 
 log = logging.getLogger(__name__)
 
 
 def stored_event_from_dlq_event_info(event: EventInfo) -> StoredDLQEvent:
     """Convert a DLQEventInfo object to a StoredDLQEvent object"""
-    event_id = event.headers[EVENT_ID_FIELD]
+    event_id = event.headers[HeaderNames.EVENT_ID]
     service = event_id.split(",")[0]
-    event_dict = event.model_dump()
-    stored_event = StoredDLQEvent(service=service, event_id=event_id, **event_dict)
+    stored_event = StoredDLQEvent(
+        service=service,
+        event_id=event_id,
+        topic=event.headers[HeaderNames.ORIGINAL_TOPIC],
+        type_=event.type_,
+        payload=event.payload,
+        key=event.key,
+        headers=event.headers,
+        timestamp=event.timestamp,
+    )
     return stored_event
 
 
@@ -57,7 +63,7 @@ class DLQManager(DLQManagerPort):
         self._aggregator = aggregator
 
     async def _delete_event(self, *, event_id: str) -> None:
-        """Delete the event with the given `event_ID` from the database.
+        """Delete the event with the given `event_id` from the database.
 
         Raises a `DLQDeletionError` if the event could not be found.
         The error is raised because in this service we always retrieve the event
@@ -144,26 +150,21 @@ class DLQManager(DLQManagerPort):
         *,
         service: str,
         topic: str,
-        skip: int,
-        limit: int,
+        skip: int = 0,
+        limit: int | None = None,
     ) -> list[EventInfo]:
         """Return a list of the next DLQ events for the given `service` and `topic`.
 
         Args:
         - `service`: The name of the service to preview events for.
         - `topic`: The name of the topic to preview.
-        - `skip`: The number of events to skip for pagination.
-        - `limit`: The maximum number of events to return for pagination.
+        - `skip`: The number of events to skip for pagination. Default is 0.
+        - `limit`: The maximum number of events to return. Default is 0 (no limit).
 
         Raises:
-        - `ValueError` if `skip` and/or `limit` are less than 0.
-        - `DLQPreviewError` if the preview fails during the aggregation.
+        - `ValueError` if there is a problem with the params supplied to the aggregator.
+        - `DLQPreviewError` if the preview fails during the aggregation
         """
-        if limit < 0 or skip < 0:
-            raise ValueError(
-                f"Skip and limit must be 0 or greater. Got {skip=}, {limit=}"
-            )
-
         try:
             events = await self._aggregator.aggregate(
                 service=service, topic=topic, skip=skip, limit=limit
@@ -209,7 +210,7 @@ class DLQManager(DLQManagerPort):
             raise dlq_error from err
 
         # The only header required for events to be retried is the original topic header
-        to_publish.headers = {ORIGINAL_TOPIC_FIELD: topic}
+        to_publish.headers = {HeaderNames.ORIGINAL_TOPIC: topic}
 
         # For dry-runs, only return the event to be published
         if dry_run:

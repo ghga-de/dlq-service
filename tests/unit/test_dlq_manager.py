@@ -19,13 +19,14 @@ from contextlib import nullcontext
 from unittest.mock import AsyncMock
 
 import pytest
+from hexkit.correlation import new_correlation_id
 from pytest import MonkeyPatch
 
 from dlqs.core.dlq_manager import stored_event_from_dlq_event_info
 from dlqs.inject import prepare_core
 from dlqs.models import EventInfo, StoredDLQEvent
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
-from hexkit.correlation import new_correlation_id
+from dlqs.ports.outbound.dao import AggregatorPort
 from tests.fixtures import utils
 from tests.fixtures.config import DEFAULT_CONFIG
 
@@ -71,11 +72,11 @@ def test_dlq_error_text():
 
 def test_stored_event_from_dlq_event_info():
     """Test the conversion of a DLQEventInfo object to a StoredDLQEvent object"""
-    dlq_event = utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")
+    dlq_event = utils.graph_event()
     stored_dlq_event = stored_event_from_dlq_event_info(dlq_event)
-    assert stored_dlq_event.service == "fss"
-    assert stored_dlq_event.event_id == "fss,graph-updates,0,842"
-    assert stored_dlq_event.topic == DEFAULT_CONFIG.kafka_dlq_topic
+    assert stored_dlq_event.service == utils.FSS
+    assert stored_dlq_event.event_id == f"{utils.FSS},{utils.GRAPH_UPDATES},0,0"
+    assert stored_dlq_event.topic == utils.GRAPH_UPDATES
     assert stored_dlq_event.payload == dlq_event.payload
     assert stored_dlq_event.headers == dlq_event.headers
     assert stored_dlq_event.key == dlq_event.key
@@ -89,7 +90,7 @@ async def test_process_override_different_cid(monkeypatch: MonkeyPatch):
     published to the retry topic if the correlation ID does not match the one from
     the original event.
     """
-    dlq_event = utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")
+    dlq_event = utils.graph_event()
     stored_dlq_event = stored_event_from_dlq_event_info(dlq_event)
     override_headers = dlq_event.headers.copy()
     override_headers["correlation_id"] = new_correlation_id()
@@ -116,7 +117,7 @@ async def test_process_override_different_cid(monkeypatch: MonkeyPatch):
 @pytest.mark.asyncio
 async def test_process_dry_run():
     """Ensure `process` doesn't actually publish the event if `dry_run` is True."""
-    dlq_event = utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")
+    dlq_event = utils.graph_event()
     stored_dlq_event = stored_event_from_dlq_event_info(dlq_event)
 
     mock_dao = AsyncMock()
@@ -141,7 +142,7 @@ async def test_process_dry_run():
 @pytest.mark.asyncio
 async def test_process_override_success():
     """Verify that the DLQManager successfully processes an event with an override."""
-    dlq_event = utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")
+    dlq_event = utils.graph_event()
     stored_dlq_event = stored_event_from_dlq_event_info(dlq_event)
 
     # The event failed because the schema and type was outdated, so we update and retry
@@ -177,7 +178,7 @@ async def test_process_override_success():
 
 @pytest.mark.parametrize(
     "override",
-    [None, utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")],
+    [None, utils.graph_event()],
 )
 @pytest.mark.asyncio
 async def test_process_with_empty_dlq(override: EventInfo | None):
@@ -205,7 +206,7 @@ async def test_process_with_empty_dlq(override: EventInfo | None):
 
 @pytest.mark.parametrize(
     "skip, limit",
-    [(0, 5), (5, 5), (10, 5), (15, 0)],
+    [(0, 5), (5, 5), (10, 5), (15, None)],
     ids=[
         "Beginning to Middle",
         "Middle to End",
@@ -215,21 +216,8 @@ async def test_process_with_empty_dlq(override: EventInfo | None):
 )
 @pytest.mark.asyncio
 async def test_preview_pagination_valid_params(skip: int, limit: int):
-    """Test that the preview pagination works as expected."""
-    dlq_size = 10
-    dlq_events = [
-        utils.get_graph_event(target="dlq", user_id1=f"user{i}", user_id2=f"node{i}")
-        for i in range(dlq_size)
-    ]
-    stored_dlq_events = [
-        stored_event_from_dlq_event_info(event) for event in dlq_events
-    ]
-
-    async def _fake_agg(service: str, topic: str, skip: int, limit: int):
-        return stored_dlq_events[skip : skip + limit]
-
+    """Test that `preview_events` calls the aggregator with correct params."""
     mock_agg = AsyncMock()
-    mock_agg.aggregate = _fake_agg
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
@@ -237,31 +225,42 @@ async def test_preview_pagination_valid_params(skip: int, limit: int):
         aggregator_override=mock_agg,
         retry_publisher_override=AsyncMock(),
     ) as dlq_manager:
-        results = await dlq_manager.preview_events(
-            service=utils.FSS, topic=utils.USER_EVENTS, limit=limit, skip=skip
+        _ = await dlq_manager.preview_events(
+            service="test", topic="test2", limit=limit, skip=skip
         )
-        assert results == dlq_events[skip : skip + limit]
-        assert len(results) == min(limit, max(0, dlq_size - skip))
+        mock_agg.aggregate.assert_called_once_with(
+            service="test", topic="test2", skip=skip, limit=limit
+        )
 
 
-@pytest.mark.parametrize(
-    "skip, limit",
-    [(0, -5), (-5, -5), (-5, 0)],
-    ids=["Negative Limit", "Both Negative", "Negative Skip"],
-)
 @pytest.mark.asyncio
-async def test_preview_pagination_invalid_params(skip: int, limit: int):
-    """Verify that preview_events with invalid skip/limit params raises a ValueError."""
+async def test_value_error_propagation():
+    """Verify that `preview_events` lets ValueErrors bubble up."""
+    error_mock = AsyncMock()
+    error_mock.aggregate.side_effect = ValueError("Invalid params")
     async with prepare_core(
         config=DEFAULT_CONFIG,
         dao_override=AsyncMock(),
-        aggregator_override=AsyncMock(),
+        aggregator_override=error_mock,
         retry_publisher_override=AsyncMock(),
     ) as dlq_manager:
-        with pytest.raises(ValueError):
-            _ = await dlq_manager.preview_events(
-                service=utils.FSS, topic=utils.USER_EVENTS, limit=limit, skip=skip
-            )
+        with pytest.raises(ValueError, match="Invalid params"):
+            _ = await dlq_manager.preview_events(service="NA", topic="NA2")
+
+
+@pytest.mark.asyncio
+async def test_preview_db_error():
+    """Test that AggregatorPort.AggregationError is translated to DLQPreviewError"""
+    error_mock = AsyncMock()
+    error_mock.aggregate.side_effect = AggregatorPort.AggregationError(parameters="")
+    async with prepare_core(
+        config=DEFAULT_CONFIG,
+        dao_override=AsyncMock(),
+        aggregator_override=error_mock,
+        retry_publisher_override=AsyncMock(),
+    ) as dlq_manager:
+        with pytest.raises(DLQManagerPort.DLQPreviewError):
+            _ = await dlq_manager.preview_events(service="test", topic="test2")
 
 
 @pytest.mark.parametrize(
@@ -274,25 +273,28 @@ async def test_discard_event(event_exists: bool, error: bool):
     """Test what happens when we call `discard_event`.
 
     Should cover the following cases:
-    - Event exists in the DLQ for the requested service
-    - Event does not exist in the DLQ, but not for the requested service
+    - Event exists in the DLQ for the requested service (happy path)
     - Event exists but delete fails
+    - Event does not exist in the DLQ (nothing should happen)
     """
-    dlq_event = utils.get_graph_event(target="dlq", user_id1="user1", user_id2="user2")
+    dlq_event = utils.user_event(service="fss", offset=0)
     stored_dlq_event = stored_event_from_dlq_event_info(dlq_event)
 
-    async def _fake_agg(service: str, topic: str, skip: int, limit: int):
+    async def _fake_aggregate(*args, **kwargs):
+        """Dummy aggregator method that returns an event based on `event_exists`."""
         return [stored_dlq_event] if event_exists else []
 
     mock_dao = AsyncMock()
+    # If we want to simulate a deletion error, we raise an exception on the mock
     if error:
         mock_dao.delete.side_effect = DLQManagerPort.DLQDeletionError(
             event_id=stored_dlq_event.event_id
         )
     mock_agg = AsyncMock()
-    mock_agg.aggregate = _fake_agg
+    mock_agg.aggregate = _fake_aggregate
     mock_retry_publisher = AsyncMock()
-    service = utils.FSS if event_exists else utils.UFS
+
+    # Our mock returns only for the
     async with prepare_core(
         config=DEFAULT_CONFIG,
         dao_override=mock_dao,
@@ -300,9 +302,12 @@ async def test_discard_event(event_exists: bool, error: bool):
         retry_publisher_override=mock_retry_publisher,
     ) as dlq_manager:
         with pytest.raises(dlq_manager.DLQDeletionError) if error else nullcontext():
-            await dlq_manager.discard_event(service=service, topic=utils.USER_EVENTS)
+            await dlq_manager.discard_event(service=utils.FSS, topic=utils.USER_EVENTS)
+
+        # The retry publisher should never be used for `discard_event`
         mock_retry_publisher.send_to_retry_topic.assert_not_called()
 
+        # Verify that we only called the DAO's "delete" method if the event existed
         if event_exists:
             mock_dao.delete.assert_called_once_with(stored_dlq_event.event_id)
         else:
