@@ -90,7 +90,6 @@ async def prepare_rest_app(
         config=config,
         dlq_manager_override=dlq_manager_override,
     ) as dlq_manager:
-        app.dependency_overrides[dummies.dlq_config_dummy] = lambda: config
         app.dependency_overrides[dummies.dlq_manager_port] = lambda: dlq_manager
         yield app
 

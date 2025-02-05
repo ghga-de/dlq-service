@@ -21,25 +21,12 @@ from hexkit.log import LoggingConfig
 from hexkit.providers.akafka.config import KafkaConfig
 from hexkit.providers.mongodb import MongoDbConfig
 from pydantic import Field
-from pydantic_settings import BaseSettings
-
-
-class DLQConfig(BaseSettings):
-    """Configuration for the various DLQ topics managed by this service."""
-
-    # TODO: remove
-
-    events_collection: str = Field(
-        "dlqEvents",
-        description="The name of the MongoDB collection where DLQ events are stored.",
-    )
-
 
 SERVICE_NAME: str = "dlqs"
 
 
 @config_from_yaml(prefix=SERVICE_NAME)
-class Config(ApiConfigBase, LoggingConfig, KafkaConfig, DLQConfig, MongoDbConfig):
+class Config(ApiConfigBase, LoggingConfig, KafkaConfig, MongoDbConfig):
     """Config parameters and their defaults."""
 
     service_name: str = Field(

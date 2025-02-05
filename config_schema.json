@@ -39,12 +39,6 @@
       ],
       "title": "Mongo Timeout"
     },
-    "events_collection": {
-      "default": "dlqEvents",
-      "description": "The name of the MongoDB collection where DLQ events are stored.",
-      "title": "Events Collection",
-      "type": "string"
-    },
     "service_name": {
       "default": "dlqs",
       "description": "Short name of this service",

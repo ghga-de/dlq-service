@@ -100,8 +100,6 @@ The service requires the following configuration parameters:
   ```
 
 
-- **`events_collection`** *(string)*: The name of the MongoDB collection where DLQ events are stored. Default: `"dlqEvents"`.
-
 - **`service_name`** *(string)*: Short name of this service. Default: `"dlqs"`.
 
 - **`service_instance_id`** *(string, required)*: A string that uniquely identifies this instance across all instances of this service. This is included in log messages.

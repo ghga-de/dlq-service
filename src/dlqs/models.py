@@ -38,18 +38,3 @@ class StoredDLQEvent(EventInfo):
         ),
         examples=["ifrs,file-downloads,0,233"],
     )
-
-
-class Services(BaseModel):
-    """A model representing a service name and the topics it subscribes to."""
-
-    service: str = Field(
-        ...,
-        description="The name of the service",
-        examples=["ifrs", "dcs", "nos", "ns"],
-    )
-    topics: list[str] = Field(
-        ...,
-        description="A list of the names of the topics the service subscribes to.",
-        examples=[["file-downloads", "users", "access-requests"]],
-    )

@@ -6,7 +6,6 @@ cors_allowed_methods: null
 cors_allowed_origins: null
 db_name: test
 docs_url: /docs
-events_collection: dlqEvents
 generate_correlation_id: true
 host: 127.0.0.1
 kafka_dlq_topic: dlq
