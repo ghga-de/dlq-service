@@ -21,10 +21,10 @@ Additional endpoints might be structured in dedicated modules
 """
 
 from ghga_service_commons.api import run_server
+from hexkit.log import configure_logging
 
 from dlqs.config import Config
 from dlqs.inject import prepare_rest_app
-from hexkit.log import configure_logging
 
 
 async def run_rest_app():

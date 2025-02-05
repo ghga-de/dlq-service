@@ -25,7 +25,7 @@ version = "1.0.0"
 description = "DLQ Service - a service to manage the dead letter queue for Kafka events"
 dependencies = [
     "typer >= 0.12",
-    "ghga-service-commons[api] >= 3.1",
+    "ghga-service-commons[api] >= 3.3",
     "hexkit[akafka,mongodb] >= 4",
 ]
 

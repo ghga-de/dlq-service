@@ -20,12 +20,12 @@ from dataclasses import dataclass
 
 import pytest_asyncio
 from ghga_service_commons.api.testing import AsyncTestClient
+from hexkit.providers.akafka.testutils import KafkaFixture
+from hexkit.providers.mongodb.testutils import MongoDbFixture
 
 from dlqs.config import Config
 from dlqs.inject import prepare_core, prepare_rest_app
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
-from hexkit.providers.akafka.testutils import KafkaFixture
-from hexkit.providers.mongodb.testutils import MongoDbFixture
 from tests.fixtures.config import get_config
 
 

@@ -17,9 +17,10 @@
 
 import logging
 
+from hexkit.protocols.eventpub import EventPublisherProtocol
+
 from dlqs.models import EventInfo
 from dlqs.ports.outbound.event_pub import RetryPublisherPort
-from hexkit.protocols.eventpub import EventPublisherProtocol
 
 log = logging.getLogger(__name__)
 

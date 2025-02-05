@@ -4,6 +4,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
 
 from fastapi import FastAPI
+from hexkit.providers.akafka.provider import KafkaEventPublisher, KafkaEventSubscriber
+from hexkit.providers.mongodb import MongoDbDaoFactory
 
 from dlqs.adapters.inbound.event_sub import DLQSubTranslator
 from dlqs.adapters.inbound.fastapi_ import dummies
@@ -15,8 +17,6 @@ from dlqs.core.dlq_manager import DLQManager
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 from dlqs.ports.outbound.dao import AggregatorPort
 from dlqs.ports.outbound.event_pub import RetryPublisherPort
-from hexkit.providers.akafka.provider import KafkaEventPublisher, KafkaEventSubscriber
-from hexkit.providers.mongodb import MongoDbDaoFactory
 
 
 async def get_dao(*, config: Config) -> EventDaoPort:
