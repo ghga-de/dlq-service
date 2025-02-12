@@ -36,7 +36,8 @@ async def get_event_dao(*, dao_factory: DaoFactoryProtocol) -> EventDaoPort:
     return await dao_factory.get_dao(
         name=DLQ_EVENTS_COLLECTION,
         dto_model=StoredDLQEvent,
-        id_field="event_id",
+        id_field="dlq_id",
+        # fields_to_index=["dlq_info.service", "topic"],  # Add in the future
     )
 
 
@@ -69,7 +70,7 @@ class Aggregator(AggregatorPort):
             raise ValueError(f"Limit must be greater than 0 if supplied, got {limit}")
 
         pipeline: list[dict[str, Any]] = [
-            {"$match": {"service": service, "topic": topic}},
+            {"$match": {"dlq_info.service": service, "topic": topic}},
             {"$sort": {"timestamp": 1}},
             {"$skip": skip},
         ]
@@ -82,7 +83,7 @@ class Aggregator(AggregatorPort):
                 return []
             results = self._collection.aggregate(pipeline=pipeline)
             return [
-                document_to_dto(item, id_field="event_id", dto_model=StoredDLQEvent)
+                document_to_dto(item, id_field="dlq_id", dto_model=StoredDLQEvent)
                 async for item in results
             ]
         except OperationFailure as err:

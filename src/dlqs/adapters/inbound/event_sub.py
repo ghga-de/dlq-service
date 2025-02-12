@@ -20,7 +20,7 @@ from datetime import datetime
 from hexkit.custom_types import Ascii, JsonObject
 from hexkit.protocols.eventsub import DLQSubscriberProtocol
 
-from dlqs.models import EventInfo
+from dlqs.models import RawDLQEvent
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 
 
@@ -42,7 +42,7 @@ class DLQSubTranslator(DLQSubscriberProtocol):
         headers: Mapping[str, str],
     ) -> None:
         """Consume an event"""
-        event = EventInfo(
+        event = RawDLQEvent(
             payload=payload,  # type: ignore
             type_=type_,
             topic=topic,

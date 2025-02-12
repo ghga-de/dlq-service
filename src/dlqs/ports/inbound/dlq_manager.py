@@ -15,8 +15,9 @@
 """DLQ Manager Port definition"""
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
-from dlqs.models import EventInfo
+from dlqs.models import EventCore, PublishableEventData, RawDLQEvent, StoredDLQEvent
 
 
 class DLQManagerPort(ABC):
@@ -34,8 +35,8 @@ class DLQManagerPort(ABC):
     class DLQValidationError(RuntimeError):
         """Raised when an event from the DLQ fails validation."""
 
-        def __init__(self, *, event_id: str, reason: str):
-            msg = f"Validation failed for DLQ Event '{event_id}': {reason}"
+        def __init__(self, *, dlq_id: UUID, reason: str):
+            msg = f"Validation failed for DLQ Event '{dlq_id}': {reason}"
             super().__init__(msg)
 
     class DLQOperationError(RuntimeError):
@@ -44,9 +45,9 @@ class DLQManagerPort(ABC):
     class DLQDeletionError(DLQOperationError):
         """Raised when an event could not be deleted from the DLQ."""
 
-        def __init__(self, *, event_id: str):
+        def __init__(self, *, dlq_id: UUID):
             msg = (
-                f"Could not delete DLQ event '{event_id}' from the database."
+                f"Could not delete DLQ event '{dlq_id}' from the database."
                 + " Maybe the event was already deleted or the database is unreachable."
             )
             super().__init__(msg)
@@ -54,8 +55,8 @@ class DLQManagerPort(ABC):
     class DLQInsertionError(DLQOperationError):
         """Raised when an event could not be inserted into the DLQ."""
 
-        def __init__(self, *, event_id: str, already_exists: bool):
-            msg = f"Could not insert DLQ event '{event_id}' into the database."
+        def __init__(self, *, dlq_id: UUID, already_exists: bool):
+            msg = f"Could not insert DLQ event '{dlq_id}' into the database."
             if already_exists:
                 msg += " Event with same ID already exists."
             super().__init__(msg)
@@ -74,8 +75,25 @@ class DLQManagerPort(ABC):
             msg = f"Failed to preview next DLQ events for service '{service}' and topic '{topic}'"
             super().__init__(msg)
 
+    class DLQSequenceError(DLQOperationError):
+        """Raised when the DLQ event ID is not next in the sequence"""
+
+        def __init__(self, *, dlq_id: UUID, service: str, topic: str, next_id: UUID):
+            msg = (
+                f"The dlq_id of the next event for service '{service}' and topic"
+                + f" '{topic}' is '{next_id}', but got '{dlq_id}'"
+            )
+            super().__init__(msg)
+
+    class DLQEmptyError(DLQOperationError):
+        """Raised when the user tries to process an empty DLQ"""
+
+        def __init__(self, *, service: str, topic: str):
+            msg = f"No DLQ events exist for service '{service}' and topic '{topic}'"
+            super().__init__(msg)
+
     @abstractmethod
-    async def store_event(self, *, event: EventInfo) -> None:
+    async def store_event(self, *, event: RawDLQEvent) -> None:
         """Store an event in the database with its service name and event ID.
 
         Raises a `DLQInsertionError` if the insertion fails.
@@ -90,7 +108,7 @@ class DLQManagerPort(ABC):
         topic: str,
         skip: int = 0,
         limit: int | None = None,
-    ) -> list[EventInfo]:
+    ) -> list[StoredDLQEvent]:
         """Return a list of the next DLQ events for the given `service` and `topic`.
 
         Args:
@@ -107,33 +125,42 @@ class DLQManagerPort(ABC):
 
     @abstractmethod
     async def process_event(
-        self, *, service: str, topic: str, override: EventInfo | None, dry_run: bool
-    ) -> EventInfo | None:
+        self,
+        *,
+        service: str,
+        topic: str,
+        dlq_id: UUID,
+        override: EventCore | None,
+        dry_run: bool,
+    ) -> PublishableEventData | None:
         """Process the next event from the DLQ for the given `service` and `topic`.
 
         Args:
         - `service`: The service name for the DLQ to process.
         - `topic`: The topic name for the DLQ to process.
+        - `dlq_id`: The ID of the DLQ event to process.
         - `override`: An optional event to publish instead of the next event.
         - `dry_run`: Whether to actually publish the event to the retry topic.
 
-        Returns the event that was or would be published (for dry-runs) else `None`.
+        Returns the event that was or would be published, else `None`.
 
         Raises:
-        - `DLQFetchNextError` if the next event retrieval fails.
-        - `DLQValidationError` if the event fails validation.
+        - `DLQSequenceError`: if the dlq_id is not next in the event sequence.
+        - `DLQEmptyError` if the DLQ for the service and topic is empty.
+        - `DLQFetchNextError` if retrieval of the next event fails due to a DB error.
+        - `DLQValidationError` if the event fails validation (e.g. invalid topic).
         - `DLQDeletionError` if the event could not be deleted from the DB after processing.
         """
         ...
 
     @abstractmethod
-    async def discard_event(self, *, service: str, topic: str) -> None:
+    async def discard_event(self, *, dlq_id: UUID) -> None:
         """Discard (delete) the next DLQ event for the given `service` and `topic`.
 
         This operation skips validation and auto-processing, simply deleting the event.
+        If the event doesn't exist, nothing happens.
 
         Raises:
-        - `DLQFetchNextError` if the next event retrieval fails.
         - `DLQDeletionError` if the event could not be deleted.
         """
         ...

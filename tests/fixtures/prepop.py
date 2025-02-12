@@ -33,18 +33,19 @@ ReferenceEventsDict = dict[str, dict[str, list[StoredDLQEvent]]]
 
 def get_event_func(service: str, topic: str):
     """Get the event creation function from utils.py for the given service and topic"""
-    if topic == utils.NOTIFICATIONS:
-        return utils.notifications_event
-    elif topic == utils.GRAPH_UPDATES:
-        return utils.graph_event
-    elif topic == utils.USER_EVENTS and service == utils.UFS:
-        return partial(utils.user_event, service="ufs")
-    elif topic == utils.USER_EVENTS and service == utils.FSS:
-        return partial(utils.user_event, service="fss")
-    else:
-        raise ValueError(
-            f"Service/topic not recognized for pre-pop fixture: {service}/{topic}"
-        )
+    if service in (utils.UFS, utils.FSS):
+        match topic:
+            case utils.NOTIFICATIONS:
+                return utils.notifications_event
+            case utils.GRAPH_UPDATES:
+                return utils.graph_event
+            case utils.USER_EVENTS:
+                return partial(utils.user_event, service=service)  # type: ignore
+            case _:
+                pass
+    raise ValueError(
+        f"Service/topic not recognized for pre-pop fixture: {service}/{topic}"
+    )
 
 
 def generate_db_events(n: int, service: str, topic: str) -> list[StoredDLQEvent]:
@@ -55,13 +56,13 @@ def generate_db_events(n: int, service: str, topic: str) -> list[StoredDLQEvent]
     now = now_as_utc()
     timestamps: list[datetime] = [now - timedelta(hours=n - i) for i in range(n)]
     event_func = get_event_func(service, topic)
-    events = []
+    db_events = []
     for i, timestamp in enumerate(timestamps):
-        event = event_func(offset=i)
-        db_event = utils.dlq_to_db(event)
+        raw_event = event_func(offset=i)
+        db_event = utils.dlq_to_db(raw_event)
         db_event.timestamp = timestamp
-        events.append(db_event)
-    return events
+        db_events.append(db_event)
+    return db_events
 
 
 @pytest.fixture(name="prepopped_events", scope="function")
@@ -95,8 +96,8 @@ def populate_db(mongodb: MongoDbFixture) -> ReferenceEventsDict:
     while events:
         i = choice(range(len(events)))
         event = events[i]
-        db_event = utils.dlq_to_db(event)
-        doc = dto_to_document(db_event, id_field="event_id")
+        db_event = event.model_copy(deep=True)
+        doc = dto_to_document(db_event, id_field="dlq_id")
         coll.insert_one(doc)
         del events[i]
 

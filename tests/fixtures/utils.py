@@ -16,10 +16,11 @@
 """Utils for Fixture handling."""
 
 from typing import Literal
+from uuid import uuid4
 
-from hexkit.providers.akafka.provider.eventsub import ExtractedEventInfo, HeaderNames
+from hexkit.providers.akafka.provider.eventsub import HeaderNames
 
-from dlqs.models import EventInfo, StoredDLQEvent
+from dlqs.models import DLQInfo, PublishableEventData, RawDLQEvent, StoredDLQEvent
 from tests.fixtures.config import DEFAULT_CONFIG
 
 # Service names
@@ -34,34 +35,42 @@ EventLocation = Literal["dlq", "retry"]
 TEST_CID = "387a028c-a272-4086-b930-6d3e3c389d51"
 
 
-def dlq_to_db(event: EventInfo) -> StoredDLQEvent:
+def dlq_to_db(event: RawDLQEvent) -> StoredDLQEvent:
     """Convert an EventInfo instance to a StoredDLQEvent instance.
 
     This performs the transformation that occurs when storing a DLQ event in the DB.
     """
-    event_id = event.headers[HeaderNames.EVENT_ID]
-    service = event_id.split(",")[0]
-    db_event = StoredDLQEvent(
+    event_id = event.headers.pop(HeaderNames.EVENT_ID)
+    service, _, partition, offset = event_id.split(",")
+    dlq_info = DLQInfo(
         service=service,
-        event_id=event_id,
-        topic=event.headers[HeaderNames.ORIGINAL_TOPIC],
+        partition=int(partition),
+        offset=int(offset),
+        exc_class=event.headers.pop(HeaderNames.EXC_CLASS, ""),
+        exc_msg=event.headers.pop(HeaderNames.EXC_MSG, ""),
+    )
+
+    db_event = StoredDLQEvent(
+        dlq_id=uuid4(),
+        topic=event.headers.pop(HeaderNames.ORIGINAL_TOPIC),
         type_=event.type_,
         payload=event.payload,
         key=event.key,
         timestamp=event.timestamp,
         headers=event.headers,
+        dlq_info=dlq_info,
     )
     return db_event
 
 
-def db_to_retry(event: StoredDLQEvent) -> ExtractedEventInfo:
-    """Convert a StoredDLQEvent instance to an ExtractedEventInfo instance.
+def db_to_retry(event: StoredDLQEvent) -> PublishableEventData:
+    """Convert a StoredDLQEvent instance to an PublishableEventData instance.
 
     This performs the transformation that occurs when publishing an event from
     the database to a retry topic.
     """
-    retry_event = ExtractedEventInfo(
-        topic=event.service + "-retry",
+    retry_event = PublishableEventData(
+        topic=event.dlq_info.service + "-retry",
         type_=event.type_,
         payload=event.payload,
         key=event.key,
@@ -70,7 +79,7 @@ def db_to_retry(event: StoredDLQEvent) -> ExtractedEventInfo:
     return retry_event
 
 
-def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> EventInfo:
+def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> RawDLQEvent:
     """Generate a DLQ event for the user-events topic.
 
     Works with either the UFS (user feed service) or the FSS (friend suggestion service)
@@ -84,7 +93,7 @@ def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> EventInfo:
         HeaderNames.CORRELATION_ID: TEST_CID,
     }
 
-    dlq_user_event = EventInfo(
+    dlq_user_event = RawDLQEvent(
         topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="registration",
         payload={"user_id": user_id, "name": "John Doe"},
@@ -94,7 +103,7 @@ def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> EventInfo:
     return dlq_user_event
 
 
-def notifications_event(*, offset: int = 0) -> EventInfo:
+def notifications_event(*, offset: int = 0) -> RawDLQEvent:
     """Generate a DLQ event for the notifications topic.
 
     Only for the UFS (user feed service).
@@ -109,7 +118,7 @@ def notifications_event(*, offset: int = 0) -> EventInfo:
         HeaderNames.CORRELATION_ID: TEST_CID,
     }
 
-    notifications_event = EventInfo(
+    notifications_event = RawDLQEvent(
         topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="tagged_in_photo",
         payload={
@@ -124,7 +133,7 @@ def notifications_event(*, offset: int = 0) -> EventInfo:
     return notifications_event
 
 
-def graph_event(*, offset: int = 0) -> EventInfo:
+def graph_event(*, offset: int = 0) -> RawDLQEvent:
     """Generate a DLQ event for the graph-updates topic.
 
     Only for the FSS (friend suggestion service).
@@ -139,7 +148,7 @@ def graph_event(*, offset: int = 0) -> EventInfo:
         HeaderNames.CORRELATION_ID: TEST_CID,
     }
 
-    graph_event = EventInfo(
+    graph_event = RawDLQEvent(
         topic=DEFAULT_CONFIG.kafka_dlq_topic,
         type_="connection_added",
         payload={"source_id": user_id1, "dest_id": user_id2},

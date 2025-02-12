@@ -16,7 +16,7 @@
 
 from abc import ABC, abstractmethod
 
-from hexkit.protocols.dao import Dao
+from hexkit.protocols.dao import Dao, ResourceNotFoundError  # noqa: F401
 
 from dlqs.models import StoredDLQEvent
 
@@ -45,6 +45,8 @@ class AggregatorPort(ABC):
         - `skip`: The number of events to skip for pagination.
         - `limit`: The maximum number of events to return for pagination.
 
-        Raises an `AggregationError` if the aggregation fails.
+        Raises:
+        - `ValueError` if `skip` or `limit` is invalid.
+        - `AggregationError` if the aggregation fails.
         """
         ...

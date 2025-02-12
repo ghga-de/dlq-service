@@ -16,33 +16,56 @@
 """Domain logic for the DLQ Service"""
 
 import logging
+from uuid import UUID, uuid4
 
 from hexkit.correlation import set_correlation_id
 from hexkit.protocols.dao import ResourceAlreadyExistsError
+from hexkit.protocols.eventpub import EventPublisherProtocol
 from hexkit.providers.akafka.provider.eventsub import HeaderNames
 
 from dlqs.config import Config
-from dlqs.models import EventInfo, StoredDLQEvent
+from dlqs.models import (
+    DLQInfo,
+    EventCore,
+    PublishableEventData,
+    RawDLQEvent,
+    StoredDLQEvent,
+)
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
-from dlqs.ports.outbound.dao import AggregatorPort, EventDaoPort
-from dlqs.ports.outbound.event_pub import RetryPublisherPort
+from dlqs.ports.outbound.dao import AggregatorPort, EventDaoPort, ResourceNotFoundError
 
 log = logging.getLogger(__name__)
 
 
-def stored_event_from_dlq_event_info(event: EventInfo) -> StoredDLQEvent:
-    """Convert a DLQEventInfo object to a StoredDLQEvent object"""
+def stored_event_from_raw_event(event: RawDLQEvent) -> StoredDLQEvent:
+    """Convert a RawDLQEvent object to a StoredDLQEvent object"""
+    # Create a new UUID for the DLQ event
+    dlq_id = uuid4()
+
+    # Extract the DLQ info from the headers
     event_id = event.headers[HeaderNames.EVENT_ID]
-    service = event_id.split(",")[0]
-    stored_event = StoredDLQEvent(
+    og_topic = event.headers[HeaderNames.ORIGINAL_TOPIC]
+    service, _, partition, offset = event_id.split(",")
+    exc_class = event.headers.get(HeaderNames.EXC_CLASS, "")
+    exc_msg = event.headers.get(HeaderNames.EXC_MSG, "")
+    dlq_info = DLQInfo(
         service=service,
-        event_id=event_id,
-        topic=event.headers[HeaderNames.ORIGINAL_TOPIC],
+        partition=int(partition),
+        offset=int(offset),
+        exc_class=exc_class,
+        exc_msg=exc_msg,
+    )
+
+    # Create the final object to be stored in the database
+    stored_event = StoredDLQEvent(
+        dlq_id=dlq_id,
+        topic=og_topic,
         type_=event.type_,
         payload=event.payload,
         key=event.key,
-        headers=event.headers,
         timestamp=event.timestamp,
+        headers={HeaderNames.CORRELATION_ID: event.headers[HeaderNames.CORRELATION_ID]},
+        dlq_info=dlq_info,
     )
     return stored_event
 
@@ -53,27 +76,27 @@ class DLQManager(DLQManagerPort):
     def __init__(
         self,
         config: Config,
-        retry_publisher: RetryPublisherPort,
+        publisher: EventPublisherProtocol,
         dao: EventDaoPort,
         aggregator: AggregatorPort,
     ):
         self._config = config
-        self._retry_publisher = retry_publisher
+        self._publisher = publisher
         self._dao = dao
         self._aggregator = aggregator
 
-    async def _delete_event(self, *, event_id: str) -> None:
-        """Delete the event with the given `event_id` from the database.
+    async def _delete_event(self, *, dlq_id: UUID) -> None:
+        """Delete the event with the given `dlq_id` from the database.
 
         Raises a `DLQDeletionError` if the event could not be found.
         The error is raised because in this service we always retrieve the event
         before deleting it.
         """
         try:
-            await self._dao.delete(event_id)
-            log.debug("Deleted DLQ event with '%s'", event_id)
+            await self._dao.delete(dlq_id)
+            log.debug("Deleted DLQ event with '%s'", dlq_id)
         except Exception as err:
-            error = self.DLQDeletionError(event_id=event_id)
+            error = self.DLQDeletionError(dlq_id=dlq_id)
             log.error(error)
             raise error from err
 
@@ -100,46 +123,32 @@ class DLQManager(DLQManagerPort):
         log.debug("No DLQ events found for service %s and topic %s", service, topic)
         return None
 
-    def _validate_event(
-        self, *, stored_event: StoredDLQEvent, to_publish: EventInfo
-    ) -> None:
+    def _validate_event(self, *, event: EventCore) -> None:
         """Validate the event before processing it.
 
         Ensures that:
-        - The correlation ID is set and matches the stored event.
         - The topic field is not set to a retry topic.
 
         Raises a `ValueError` if any of the above conditions are not met.
         """
-        # Correlation ID must be the same
-        if not to_publish.headers["correlation_id"]:
-            raise ValueError("Correlation ID not set")
-
-        # Assume stored DLQ events always have a correlation ID (they should)
-        expected_cid = stored_event.headers["correlation_id"]
-        actual_cid = to_publish.headers["correlation_id"]
-        if actual_cid != expected_cid:
-            raise ValueError(
-                f"Correlation ID mismatch. Expected {expected_cid}, got {actual_cid}"
-            )
-
         # Published event can't have DLQ or '-retry' in the topic
-        if to_publish.topic.endswith("-retry"):
-            raise ValueError(
-                f"Resolved event topic can't be set to '{to_publish.topic}'"
-            )
+        if (
+            event.topic.endswith("-retry")
+            or event.topic == self._config.kafka_dlq_topic
+        ):
+            raise ValueError(f"Resolved event topic can't be set to '{event.topic}'")
 
-    async def store_event(self, *, event: EventInfo) -> None:
+    async def store_event(self, *, event: RawDLQEvent) -> None:
         """Store an event in the database with its service name and event ID.
 
         Raises a `DLQInsertionError` if the insertion fails.
         """
-        stored_event = stored_event_from_dlq_event_info(event)
+        stored_event = stored_event_from_raw_event(event)
         try:
             await self._dao.insert(stored_event)
         except Exception as err:
             error = self.DLQInsertionError(
-                event_id=stored_event.event_id,
+                dlq_id=stored_event.dlq_id,
                 already_exists=isinstance(err, ResourceAlreadyExistsError),
             )
             log.error(error)
@@ -152,7 +161,7 @@ class DLQManager(DLQManagerPort):
         topic: str,
         skip: int = 0,
         limit: int | None = None,
-    ) -> list[EventInfo]:
+    ) -> list[StoredDLQEvent]:
         """Return a list of the next DLQ events for the given `service` and `topic`.
 
         Args:
@@ -174,77 +183,96 @@ class DLQManager(DLQManagerPort):
             log.error(error)
             raise error from err
 
-        return [EventInfo(**event.model_dump()) for event in events]
+        return [StoredDLQEvent(**event.model_dump()) for event in events]
 
     async def process_event(
-        self, *, service: str, topic: str, override: EventInfo | None, dry_run: bool
-    ) -> EventInfo | None:
+        self,
+        *,
+        service: str,
+        topic: str,
+        dlq_id: UUID,
+        override: EventCore | None,
+        dry_run: bool,
+    ) -> PublishableEventData | None:
         """Process the next event from the DLQ for the given `service` and `topic`.
 
         Args:
         - `service`: The service name for the DLQ to process.
         - `topic`: The topic name for the DLQ to process.
+        - `dlq_id`: The ID of the DLQ event to process.
         - `override`: An optional event to publish instead of the next event.
         - `dry_run`: Whether to actually publish the event to the retry topic.
 
-        Returns the event that was or would be published (for dry-runs) else `None`.
+        Returns the event that was or would be published, else `None`.
 
         Raises:
-        - `DLQFetchNextError` if the next event retrieval fails.
-        - `DLQValidationError` if the event fails validation.
+        - `DLQSequenceError`: if the dlq_id is not next in the event sequence.
+        - `DLQEmptyError` if the DLQ for the service and topic is empty.
+        - `DLQFetchNextError` if retrieval of the next event fails due to a DB error.
+        - `DLQValidationError` if the event fails validation (e.g. invalid topic).
         - `DLQDeletionError` if the event could not be deleted from the DB after processing.
         """
         next_event = await self._get_next_event(service=service, topic=topic)
         if not next_event:
-            return None
+            empty_dlq_error = self.DLQEmptyError(service=service, topic=topic)
+            log.error(empty_dlq_error)
+            raise empty_dlq_error
+        elif next_event.dlq_id != dlq_id:
+            # If the supplied dlq ID doesn't match that of the next event, raise an error
+            sequence_error = self.DLQSequenceError(
+                dlq_id=dlq_id, service=service, topic=topic, next_id=next_event.dlq_id
+            )
+            log.error(sequence_error)
+            raise sequence_error
 
-        event_id = next_event.event_id
-        to_publish = override if override else next_event
+        # Get the correlation ID from the stored event
+        correlation_id = next_event.headers.pop(HeaderNames.CORRELATION_ID)
+
+        # Distill the main publishable event data (we don't care about the rest)
+        core_publish_data = override or EventCore(**next_event.model_dump())
 
         # Perform event validation
         try:
-            self._validate_event(stored_event=next_event, to_publish=to_publish)
+            self._validate_event(event=core_publish_data)
         except ValueError as err:
-            dlq_error = self.DLQValidationError(event_id=event_id, reason=str(err))
+            dlq_error = self.DLQValidationError(dlq_id=dlq_id, reason=str(err))
             log.error(dlq_error)
             raise dlq_error from err
 
-        # The only header required for events to be retried is the original topic header
-        to_publish.headers = {HeaderNames.ORIGINAL_TOPIC: topic}
-
-        # For dry-runs, only return the event to be published
-        if dry_run:
-            return to_publish
+        # The only header required now is the original topic header
+        publish_data = PublishableEventData(
+            **core_publish_data.model_dump(),
+            headers={HeaderNames.ORIGINAL_TOPIC: core_publish_data.topic},
+        )
+        publish_data.topic = f"{service}-retry"
 
         # If this isn't a dry-run, actually publish the event to the retry topic
-        async with set_correlation_id(next_event.headers["correlation_id"]):
-            await self._retry_publisher.send_to_retry_topic(
-                event=to_publish, retry_topic=f"{service}-retry"
-            )
+        if not dry_run:
+            async with set_correlation_id(correlation_id):
+                await self._publisher.publish(**publish_data.model_dump())
 
-        # Remove the resolved event from the database
-        await self._delete_event(event_id=event_id)
-        return to_publish
+            # Remove the resolved event from the database
+            await self._delete_event(dlq_id=dlq_id)
+        return publish_data
 
-    async def discard_event(self, *, service: str, topic: str) -> None:
+    async def discard_event(self, *, dlq_id: UUID) -> None:
         """Discard (delete) the next DLQ event for the given `service` and `topic`.
 
         This operation skips validation and auto-processing, simply deleting the event.
+        If the event doesn't exist, nothing happens.
 
         Raises:
-        - `DLQFetchNextError` if the next event retrieval fails.
         - `DLQDeletionError` if the event could not be deleted.
         """
-        next_event = await self._get_next_event(service=service, topic=topic)
-        if not next_event:
-            return
+        try:
+            event = await self._dao.get_by_id(dlq_id)
+        except ResourceNotFoundError:
+            return None
 
-        event_id = next_event.event_id
-
-        await self._delete_event(event_id=event_id)
+        await self._delete_event(dlq_id=dlq_id)
         log.info(
             "Discarded next DLQ event for %s's '%s' topic (event ID was '%s')",
-            service,
-            topic,
-            event_id,
+            event.dlq_info.service,
+            event.topic,
+            dlq_id,
         )

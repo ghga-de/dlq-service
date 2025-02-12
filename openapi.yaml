@@ -1,8 +1,116 @@
 components:
   schemas:
-    EventInfo:
-      description: Model representing GHGA-internal event info
+    DLQInfo:
+      description: Extra DLQ-specific information for a DLQ event
       properties:
+        exc_class:
+          default: ''
+          description: The exception class that was raised.
+          title: Exc Class
+          type: string
+        exc_msg:
+          default: ''
+          description: The exception message that was raised.
+          title: Exc Msg
+          type: string
+        offset:
+          description: The offset of the event.
+          title: Offset
+          type: integer
+        partition:
+          description: The partition of the event.
+          title: Partition
+          type: integer
+        service:
+          description: The name of the service that failed to process the event.
+          title: Service
+          type: string
+      required:
+      - service
+      - partition
+      - offset
+      title: DLQInfo
+      type: object
+    EventCore:
+      description: Model representing the core GHGA-internal event info
+      properties:
+        key:
+          description: The key of the event.
+          title: Key
+          type: string
+        payload:
+          description: The payload for the event.
+          title: Payload
+          type: object
+        topic:
+          description: The name of the original topic the event was located in.
+          title: Topic
+          type: string
+        type_:
+          description: The 'type' given to the original event.
+          title: Type
+          type: string
+      required:
+      - topic
+      - type_
+      - payload
+      - key
+      title: EventCore
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    PublishableEventData:
+      description: Only the data needed to publish an event -- core data and headers
+      properties:
+        headers:
+          additionalProperties:
+            type: string
+          description: Any headers for the event. Must at least include correlation
+            ID.
+          title: Headers
+          type: object
+        key:
+          description: The key of the event.
+          title: Key
+          type: string
+        payload:
+          description: The payload for the event.
+          title: Payload
+          type: object
+        topic:
+          description: The name of the original topic the event was located in.
+          title: Topic
+          type: string
+        type_:
+          description: The 'type' given to the original event.
+          title: Type
+          type: string
+      required:
+      - headers
+      - topic
+      - type_
+      - payload
+      - key
+      title: PublishableEventData
+      type: object
+    StoredDLQEvent:
+      description: Model representing a DLQ event as it exists in the database
+      properties:
+        dlq_id:
+          description: The unique DLQS identifier for a DLQ event
+          format: uuid4
+          title: Dlq Id
+          type: string
+        dlq_info:
+          $ref: '#/components/schemas/DLQInfo'
+          description: The DLQ information for the DLQ event
         headers:
           additionalProperties:
             type: string
@@ -32,21 +140,14 @@ components:
           title: Type
           type: string
       required:
+      - headers
       - topic
       - type_
       - payload
       - key
-      - headers
-      title: EventInfo
-      type: object
-    HTTPValidationError:
-      properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          title: Detail
-          type: array
-      title: HTTPValidationError
+      - dlq_id
+      - dlq_info
+      title: StoredDLQEvent
       type: object
     ValidationError:
       properties:
@@ -86,23 +187,18 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
-  /{service}/{topic}:
+  /{dlq_id}:
     delete:
       description: Process the next event in the topic, optionally publishing the
         supplied event
-      operationId: discard_event__service___topic__delete
+      operationId: discard_event__dlq_id__delete
       parameters:
       - in: path
-        name: service
+        name: dlq_id
         required: true
         schema:
-          title: Service
-          type: string
-      - in: path
-        name: topic
-        required: true
-        schema:
-          title: Topic
+          format: uuid4
+          title: Dlq Id
           type: string
       responses:
         '204':
@@ -114,6 +210,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Discard Event
+  /{service}/{topic}:
     get:
       description: 'Return the next events in the topic.
 
@@ -155,7 +252,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/EventInfo'
+                  $ref: '#/components/schemas/StoredDLQEvent'
                 title: Response Get Events  Service   Topic  Get
                 type: array
           description: Successful Response
@@ -184,6 +281,13 @@ paths:
           title: Topic
           type: string
       - in: query
+        name: dlq_id
+        required: true
+        schema:
+          format: uuid4
+          title: Dlq Id
+          type: string
+      - in: query
         name: dry_run
         required: false
         schema:
@@ -195,11 +299,18 @@ paths:
           application/json:
             schema:
               anyOf:
-              - $ref: '#/components/schemas/EventInfo'
+              - $ref: '#/components/schemas/EventCore'
               - type: 'null'
               title: Override
       responses:
-        '204':
+        '200':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/PublishableEventData'
+                - type: 'null'
+                title: Response Process Event  Service   Topic  Post
           description: Successful Response
         '422':
           content:

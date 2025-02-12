@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
 
 from fastapi import FastAPI
+from hexkit.protocols.eventpub import EventPublisherProtocol
 from hexkit.providers.akafka.provider import KafkaEventPublisher, KafkaEventSubscriber
 from hexkit.providers.mongodb import MongoDbDaoFactory
 
@@ -11,12 +12,10 @@ from dlqs.adapters.inbound.event_sub import DLQSubTranslator
 from dlqs.adapters.inbound.fastapi_ import dummies
 from dlqs.adapters.inbound.fastapi_.configure import get_configured_app
 from dlqs.adapters.outbound.dao import EventDaoPort, get_aggregator, get_event_dao
-from dlqs.adapters.outbound.event_pub import RetryPublisher
 from dlqs.config import Config
 from dlqs.core.dlq_manager import DLQManager
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 from dlqs.ports.outbound.dao import AggregatorPort
-from dlqs.ports.outbound.event_pub import RetryPublisherPort
 
 
 async def get_dao(*, config: Config) -> EventDaoPort:
@@ -27,12 +26,12 @@ async def get_dao(*, config: Config) -> EventDaoPort:
 
 
 @asynccontextmanager
-async def get_retry_publisher(
+async def get_event_publisher(
     *, config: Config
-) -> AsyncGenerator[RetryPublisherPort, None]:
+) -> AsyncGenerator[EventPublisherProtocol, None]:
     """Constructs and initializes the retry publisher."""
     async with KafkaEventPublisher.construct(config=config) as publisher:
-        yield RetryPublisher(publisher)
+        yield publisher
 
 
 @asynccontextmanager
@@ -41,7 +40,7 @@ async def prepare_core(
     config: Config,
     dao_override: EventDaoPort | None = None,
     aggregator_override: AggregatorPort | None = None,
-    retry_publisher_override: RetryPublisherPort | None = None,
+    publisher_override: EventPublisherProtocol | None = None,
 ) -> AsyncGenerator[DLQManagerPort, None]:
     """Constructs and initializes all core components and their outbound dependencies.
 
@@ -51,15 +50,12 @@ async def prepare_core(
     aggregator = aggregator_override or get_aggregator(config=config)
 
     async with (
-        nullcontext(retry_publisher_override)
-        if retry_publisher_override
-        else get_retry_publisher(config=config) as retry_publisher
+        nullcontext(publisher_override)
+        if publisher_override
+        else get_event_publisher(config=config) as publisher
     ):
         yield DLQManager(
-            config=config,
-            retry_publisher=retry_publisher,
-            dao=dao,
-            aggregator=aggregator,
+            config=config, publisher=publisher, dao=dao, aggregator=aggregator
         )
 
 

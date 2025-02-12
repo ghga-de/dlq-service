@@ -18,7 +18,7 @@
 from fastapi import status
 from ghga_service_commons.httpyexpect.server.exceptions import HttpCustomExceptionBase
 
-from dlqs.models import EventInfo
+from dlqs.models import EventCore
 
 
 class HttpInternalServerError(HttpCustomExceptionBase):
@@ -65,7 +65,7 @@ class HttpOverrideValidationError(HttpCustomExceptionBase):
         self,
         *,
         status_code: int = status.HTTP_400_BAD_REQUEST,
-        event: EventInfo | None,
+        event: EventCore | None,
         reason: str,
     ):
         """Construct message and init the exception."""

@@ -15,11 +15,13 @@
 
 """Integration tests centered on the DlqManager class that use MongoDb and Kafka fixtures"""
 
+from uuid import uuid4
+
 import pytest
 from hexkit.providers.mongodb.provider import document_to_dto
 from hexkit.providers.mongodb.testutils import MongoDbFixture
 
-from dlqs.models import EventInfo, StoredDLQEvent
+from dlqs.models import StoredDLQEvent
 from tests.fixtures import utils
 from tests.fixtures.joint import JointFixture
 
@@ -29,34 +31,34 @@ pytestmark = pytest.mark.asyncio
 async def test_discard(
     joint_fixture: JointFixture, mongodb: MongoDbFixture, prepopped_events
 ):
-    """Verify that we can discard the next event in a topic."""
+    """Verify that we can discard an event."""
     expected = prepopped_events[utils.UFS][utils.USER_EVENTS]
     assert len(expected) > 0
 
     db_name = joint_fixture.config.db_name
     db = mongodb.client[db_name]
-    docs = db["dlqEvents"].find({"service": utils.UFS, "topic": utils.USER_EVENTS})
+    docs = db["dlqEvents"].find(
+        {"dlq_info.service": utils.UFS, "topic": utils.USER_EVENTS}
+    )
     observed = [
-        document_to_dto(doc, id_field="event_id", dto_model=StoredDLQEvent)
+        document_to_dto(doc, id_field="dlq_id", dto_model=StoredDLQEvent)
         for doc in docs.to_list()
     ]
     observed.sort(key=lambda x: x.timestamp)
     assert observed == expected
 
-    # Discard the next event in the UFS user events topic
+    # Discard the event
     length_before_discard = len(observed)
-    await joint_fixture.dlq_manager.discard_event(
-        service=utils.UFS, topic=utils.USER_EVENTS
-    )
+    await joint_fixture.dlq_manager.discard_event(dlq_id=observed[0].dlq_id)
 
     # Manually get events again, convert to DTO, and sort by timestamp
     post_discard = (
         db["dlqEvents"]
-        .find({"service": utils.UFS, "topic": utils.USER_EVENTS})
+        .find({"dlq_info.service": utils.UFS, "topic": utils.USER_EVENTS})
         .to_list()
     )
     post_discard = [
-        document_to_dto(doc, id_field="event_id", dto_model=StoredDLQEvent)
+        document_to_dto(doc, id_field="dlq_id", dto_model=StoredDLQEvent)
         for doc in post_discard
     ]
     post_discard.sort(key=lambda x: x.timestamp)
@@ -74,10 +76,8 @@ async def test_discard_empty(joint_fixture: JointFixture, mongodb: MongoDbFixtur
     cursor = db["dlqEvents"].find()
     assert not cursor.to_list()
 
-    # Discard an event (nothing should happen)
-    await joint_fixture.dlq_manager.discard_event(
-        service=utils.UFS, topic=utils.USER_EVENTS
-    )
+    # Discard an event with random non-existent dlq_id (nothing should happen)
+    await joint_fixture.dlq_manager.discard_event(dlq_id=uuid4())
 
 
 async def test_preview(joint_fixture: JointFixture, prepopped_events):
@@ -91,7 +91,7 @@ async def test_preview(joint_fixture: JointFixture, prepopped_events):
     """
     # Preview events and verify they match what was published
     expected = [
-        EventInfo(**e.model_dump())
+        StoredDLQEvent(**e.model_dump())
         for e in prepopped_events[utils.UFS][utils.USER_EVENTS]
     ]
     ufs_users_preview = await joint_fixture.dlq_manager.preview_events(
@@ -101,7 +101,7 @@ async def test_preview(joint_fixture: JointFixture, prepopped_events):
 
     # Preview FSS user events with a limit of 1
     expected = [
-        EventInfo(**e.model_dump())
+        StoredDLQEvent(**e.model_dump())
         for e in prepopped_events[utils.FSS][utils.USER_EVENTS]
     ]
     fss_users_preview = await joint_fixture.dlq_manager.preview_events(
@@ -115,7 +115,7 @@ async def test_preview(joint_fixture: JointFixture, prepopped_events):
     # Preview notifications with a skip of 8 and limit of 5 (return last 2 events)
     # The limit is an arbitrary non-zero amount that will include the last 2 events
     expected = [
-        EventInfo(**e.model_dump())
+        StoredDLQEvent(**e.model_dump())
         for e in prepopped_events[utils.UFS][utils.NOTIFICATIONS]
     ]
     notifications_preview = await joint_fixture.dlq_manager.preview_events(

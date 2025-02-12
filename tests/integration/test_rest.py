@@ -29,10 +29,7 @@ async def test_get_event_success(joint_fixture: JointFixture, prepopped_events):
     """Test successful case of getting the next event(s) for a given service/topic"""
     stored = prepopped_events[utils.UFS][utils.USER_EVENTS]
     assert len(stored) > 0
-    expected = [
-        loads(event.model_dump_json(exclude={"service", "event_id"}))
-        for event in stored
-    ]
+    expected = [loads(event.model_dump_json()) for event in stored]
 
     response = await joint_fixture.rest_client.get(f"/{utils.UFS}/{utils.USER_EVENTS}")
     assert response.status_code == 200

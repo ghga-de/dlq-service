@@ -1,7 +1,9 @@
 """FastAPI endpoint function definitions"""
 
 from fastapi import APIRouter, status
+from pydantic import UUID4
 
+from dlqs import models
 from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDependency
 from dlqs.adapters.inbound.fastapi_.http_exceptions import (
     HttpDiscardError,
@@ -9,7 +11,6 @@ from dlqs.adapters.inbound.fastapi_.http_exceptions import (
     HttpOverrideValidationError,
     HttpPreviewParamsError,
 )
-from dlqs.models import EventInfo
 
 router = APIRouter()
 
@@ -35,7 +36,7 @@ async def get_events(
     topic: str,
     skip: int = 0,
     limit: int | None = None,
-) -> list[EventInfo]:
+) -> list[models.StoredDLQEvent]:
     """Return the next events in the topic.
 
     This is a preview of the events and does not impact event ordering within the DLQ.
@@ -53,19 +54,25 @@ async def get_events(
 
 @router.post(
     "/{service}/{topic}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=status.HTTP_200_OK,
 )
-async def process_event(
+async def process_event(  # noqa: PLR0913
     service: str,
     topic: str,
     dlq_manager: DLQManagerDependency,
-    override: EventInfo | None = None,
+    dlq_id: UUID4,
+    override: models.EventCore | None = None,
     dry_run: bool = False,
-) -> None:
+) -> models.PublishableEventData | None:
     """Process the next event in the topic, optionally publishing the supplied event"""
+    # TODO: update doc string
     try:
-        await dlq_manager.process_event(
-            service=service, topic=topic, override=override, dry_run=dry_run
+        return await dlq_manager.process_event(
+            service=service,
+            topic=topic,
+            dlq_id=dlq_id,
+            override=override,
+            dry_run=dry_run,
         )
     except dlq_manager.DLQValidationError as err:
         raise HttpOverrideValidationError(event=override, reason=str(err)) from err
@@ -75,15 +82,14 @@ async def process_event(
 
 
 @router.delete(
-    "/{service}/{topic}",
+    "/{dlq_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def discard_event(
-    service: str, topic: str, dlq_manager: DLQManagerDependency
-) -> None:
+async def discard_event(dlq_id: UUID4, dlq_manager: DLQManagerDependency) -> None:
     """Process the next event in the topic, optionally publishing the supplied event"""
+    # TODO: update doc string
     try:
-        return await dlq_manager.discard_event(service=service, topic=topic)
+        return await dlq_manager.discard_event(dlq_id=dlq_id)
     except dlq_manager.DLQDeletionError as err:
         raise HttpDiscardError() from err
     except Exception as exc:
