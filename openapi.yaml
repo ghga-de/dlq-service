@@ -1,5 +1,20 @@
 components:
   schemas:
+    Body_process_event__service___topic__post:
+      properties:
+        dlq_id:
+          description: The DLQ ID of the event to process.
+          format: uuid
+          title: Dlq Id
+          type: string
+        override:
+          anyOf:
+          - $ref: '#/components/schemas/EventCore'
+          - type: 'null'
+      required:
+      - dlq_id
+      title: Body_process_event__service___topic__post
+      type: object
     DLQInfo:
       description: Extra DLQ-specific information for a DLQ event
       properties:
@@ -65,6 +80,131 @@ components:
           title: Detail
           type: array
       title: HTTPValidationError
+      type: object
+    HttpEmptyDLQError:
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HttpEmptyDLQErrorData'
+        description:
+          description: A human readable message to the client explaining the cause
+            of the exception.
+          title: Description
+          type: string
+        exception_id:
+          const: emptyDLQError
+          title: Exception Id
+          type: string
+      required:
+      - data
+      - description
+      - exception_id
+      title: HttpEmptyDLQError
+      type: object
+    HttpEmptyDLQErrorData:
+      additionalProperties: true
+      properties: {}
+      title: HttpEmptyDLQErrorData
+      type: object
+    HttpInternalServerError:
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HttpInternalServerErrorData'
+        description:
+          description: A human readable message to the client explaining the cause
+            of the exception.
+          title: Description
+          type: string
+        exception_id:
+          const: internalServerError
+          title: Exception Id
+          type: string
+      required:
+      - data
+      - description
+      - exception_id
+      title: HttpInternalServerError
+      type: object
+    HttpInternalServerErrorData:
+      additionalProperties: true
+      properties: {}
+      title: HttpInternalServerErrorData
+      type: object
+    HttpOverrideValidationError:
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HttpOverrideValidationErrorData'
+        description:
+          description: A human readable message to the client explaining the cause
+            of the exception.
+          title: Description
+          type: string
+        exception_id:
+          const: overrideValidationError
+          title: Exception Id
+          type: string
+      required:
+      - data
+      - description
+      - exception_id
+      title: HttpOverrideValidationError
+      type: object
+    HttpOverrideValidationErrorData:
+      additionalProperties: true
+      properties: {}
+      title: HttpOverrideValidationErrorData
+      type: object
+    HttpPreviewParamsError:
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HttpPreviewParamsErrorData'
+        description:
+          description: A human readable message to the client explaining the cause
+            of the exception.
+          title: Description
+          type: string
+        exception_id:
+          const: previewParamsError
+          title: Exception Id
+          type: string
+      required:
+      - data
+      - description
+      - exception_id
+      title: HttpPreviewParamsError
+      type: object
+    HttpPreviewParamsErrorData:
+      additionalProperties: true
+      properties: {}
+      title: HttpPreviewParamsErrorData
+      type: object
+    HttpSequenceError:
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HttpSequenceErrorData'
+        description:
+          description: A human readable message to the client explaining the cause
+            of the exception.
+          title: Description
+          type: string
+        exception_id:
+          const: dlqSequenceError
+          title: Exception Id
+          type: string
+      required:
+      - data
+      - description
+      - exception_id
+      title: HttpSequenceError
+      type: object
+    HttpSequenceErrorData:
+      additionalProperties: true
+      properties: {}
+      title: HttpSequenceErrorData
       type: object
     PublishableEventData:
       description: Only the data needed to publish an event -- core data and headers
@@ -189,8 +329,7 @@ paths:
       summary: health
   /{dlq_id}:
     delete:
-      description: Process the next event in the topic, optionally publishing the
-        supplied event
+      description: Discard the event with the given DLQ ID, if it exists.
       operationId: discard_event__dlq_id__delete
       parameters:
       - in: path
@@ -209,7 +348,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Discard Event
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpInternalServerError'
+          description: Internal Server Error
+      summary: Discard the event with the given DLQ ID, if it exists.
   /{service}/{topic}:
     get:
       description: 'Return the next events in the topic.
@@ -256,16 +401,28 @@ paths:
                 title: Response Get Events  Service   Topic  Get
                 type: array
           description: Successful Response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpPreviewParamsError'
+          description: Bad Request
         '422':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpInternalServerError'
+          description: Internal Server Error
       summary: Return the next events in the topic
     post:
-      description: Process the next event in the topic, optionally publishing the
-        supplied event
+      description: Returns the published event data or, if dry_run is True, the event
+        that would have been published.
       operationId: process_event__service___topic__post
       parameters:
       - in: path
@@ -281,13 +438,6 @@ paths:
           title: Topic
           type: string
       - in: query
-        name: dlq_id
-        required: true
-        schema:
-          format: uuid4
-          title: Dlq Id
-          type: string
-      - in: query
         name: dry_run
         required: false
         schema:
@@ -298,26 +448,45 @@ paths:
         content:
           application/json:
             schema:
-              anyOf:
-              - $ref: '#/components/schemas/EventCore'
-              - type: 'null'
-              title: Override
+              $ref: '#/components/schemas/Body_process_event__service___topic__post'
+        required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/PublishableEventData'
-                - type: 'null'
-                title: Response Process Event  Service   Topic  Post
+                $ref: '#/components/schemas/PublishableEventData'
           description: Successful Response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpOverrideValidationError'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpEmptyDLQError'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSequenceError'
+          description: Conflict
         '422':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
-      summary: Process Event
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpInternalServerError'
+          description: Internal Server Error
+      summary: Process and publish the next event in the topic for the given service.
 servers:
 - url: ''

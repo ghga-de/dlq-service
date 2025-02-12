@@ -193,7 +193,7 @@ class DLQManager(DLQManagerPort):
         dlq_id: UUID,
         override: EventCore | None,
         dry_run: bool,
-    ) -> PublishableEventData | None:
+    ) -> PublishableEventData:
         """Process the next event from the DLQ for the given `service` and `topic`.
 
         Args:
@@ -203,7 +203,7 @@ class DLQManager(DLQManagerPort):
         - `override`: An optional event to publish instead of the next event.
         - `dry_run`: Whether to actually publish the event to the retry topic.
 
-        Returns the event that was or would be published, else `None`.
+        Returns the event that was or would be published.
 
         Raises:
         - `DLQSequenceError`: if the dlq_id is not next in the event sequence.

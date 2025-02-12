@@ -15,6 +15,8 @@
 
 """Reusable HTTP response definitions"""
 
+from uuid import UUID
+
 from fastapi import status
 from ghga_service_commons.httpyexpect.server.exceptions import HttpCustomExceptionBase
 
@@ -76,15 +78,42 @@ class HttpOverrideValidationError(HttpCustomExceptionBase):
         )
 
 
-class HttpDiscardError(HttpCustomExceptionBase):
-    """Thrown when the discard operation fails"""
+class HttpEmptyDLQError(HttpCustomExceptionBase):
+    """Thrown when trying to process with an empty DLQ"""
 
-    exception_id = "discardError"
+    exception_id = "emptyDLQError"
 
-    def __init__(self, *, status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR):
+    def __init__(
+        self,
+        *,
+        status_code: int = status.HTTP_404_NOT_FOUND,
+        service: str,
+        topic: str,
+    ):
         """Construct message and init the exception."""
         super().__init__(
             status_code=status_code,
-            description="Discard operation failed, try again.",
-            data={},
+            description="No DLQ events exist for the given service and topic.",
+            data={"service": service, "topic": topic},
+        )
+
+
+class HttpSequenceError(HttpCustomExceptionBase):
+    """Thrown when the supplied DLQ ID doesn't match that of the next event in the DLQ"""
+
+    exception_id = "dlqSequenceError"
+
+    def __init__(
+        self,
+        *,
+        status_code: int = status.HTTP_409_CONFLICT,
+        service: str,
+        topic: str,
+        dlq_id: UUID,
+    ):
+        """Construct message and init the exception."""
+        super().__init__(
+            status_code=status_code,
+            description="The supplied DLQ ID does not match the next event in the DLQ.",
+            data={"service": service, "topic": topic, "supplied_dlq_id": str(dlq_id)},
         )

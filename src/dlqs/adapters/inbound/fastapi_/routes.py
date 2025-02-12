@@ -1,18 +1,28 @@
 """FastAPI endpoint function definitions"""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Body, status
 from pydantic import UUID4
 
 from dlqs import models
 from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDependency
 from dlqs.adapters.inbound.fastapi_.http_exceptions import (
-    HttpDiscardError,
+    HttpEmptyDLQError,
     HttpInternalServerError,
     HttpOverrideValidationError,
     HttpPreviewParamsError,
+    HttpSequenceError,
 )
+from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 
 router = APIRouter()
+
+RESPONSES = {
+    "internalServerError": {"model": HttpInternalServerError.get_body_model()},
+    "previewParamsError": {"model": HttpPreviewParamsError.get_body_model()},
+    "overrideValidationError": {"model": HttpOverrideValidationError.get_body_model()},
+    "emptyDLQError": {"model": HttpEmptyDLQError.get_body_model()},
+    "dlqSequenceError": {"model": HttpSequenceError.get_body_model()},
+}
 
 
 @router.get(
@@ -29,6 +39,11 @@ async def health():
     "/{service}/{topic}",
     summary="Return the next events in the topic",
     status_code=status.HTTP_200_OK,
+    response_model=list[models.StoredDLQEvent],
+    responses={
+        status.HTTP_400_BAD_REQUEST: RESPONSES["previewParamsError"],
+        status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"],
+    },
 )
 async def get_events(
     dlq_manager: DLQManagerDependency,
@@ -54,18 +69,33 @@ async def get_events(
 
 @router.post(
     "/{service}/{topic}",
+    summary="Process and publish the next event in the topic for the given service.",
+    description=(
+        "Returns the published event data or, if dry_run is True, the event"
+        + " that would have been published."
+    ),
     status_code=status.HTTP_200_OK,
+    response_model=models.PublishableEventData,
+    responses={
+        status.HTTP_400_BAD_REQUEST: RESPONSES["overrideValidationError"],
+        status.HTTP_404_NOT_FOUND: RESPONSES["emptyDLQError"],
+        status.HTTP_409_CONFLICT: RESPONSES["dlqSequenceError"],
+        status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"],
+    },
 )
 async def process_event(  # noqa: PLR0913
     service: str,
     topic: str,
     dlq_manager: DLQManagerDependency,
-    dlq_id: UUID4,
+    dlq_id: UUID4 = Body(..., description="The DLQ ID of the event to process."),
     override: models.EventCore | None = None,
     dry_run: bool = False,
-) -> models.PublishableEventData | None:
-    """Process the next event in the topic, optionally publishing the supplied event"""
-    # TODO: update doc string
+) -> models.PublishableEventData:
+    """Process the next event in the topic, optionally publishing the supplied event.
+
+    Returns the published event data or, if dry_run is True, the event that would have
+    been published.
+    """
     try:
         return await dlq_manager.process_event(
             service=service,
@@ -74,7 +104,11 @@ async def process_event(  # noqa: PLR0913
             override=override,
             dry_run=dry_run,
         )
-    except dlq_manager.DLQValidationError as err:
+    except DLQManagerPort.DLQSequenceError as err:
+        raise HttpSequenceError(service=service, topic=topic, dlq_id=dlq_id) from err
+    except DLQManagerPort.DLQEmptyError as err:
+        raise HttpEmptyDLQError(service=service, topic=topic) from err
+    except DLQManagerPort.DLQValidationError as err:
         raise HttpOverrideValidationError(event=override, reason=str(err)) from err
     except Exception as exc:
         # lump all other errors here
@@ -84,14 +118,13 @@ async def process_event(  # noqa: PLR0913
 @router.delete(
     "/{dlq_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Discard the event with the given DLQ ID, if it exists.",
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"]},
 )
 async def discard_event(dlq_id: UUID4, dlq_manager: DLQManagerDependency) -> None:
-    """Process the next event in the topic, optionally publishing the supplied event"""
-    # TODO: update doc string
+    """Discard the event with the given DLQ ID, if it exists."""
     try:
         return await dlq_manager.discard_event(dlq_id=dlq_id)
-    except dlq_manager.DLQDeletionError as err:
-        raise HttpDiscardError() from err
     except Exception as exc:
         # lump all other errors here
         raise HttpInternalServerError() from exc
