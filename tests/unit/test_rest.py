@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""REST API-focused unit tests for the  that mock the DlqManager"""
+"""REST API-focused unit tests that mock the DlqManager"""
 
 from unittest.mock import AsyncMock
 from uuid import UUID

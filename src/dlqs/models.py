@@ -41,6 +41,10 @@ class EventCore(BaseModel):
     key: str = Field(..., description="The key of the event.")
 
 
+class PublishableEventData(EventCore, EventHeaders):
+    """Only the data needed to publish an event -- core data and headers"""
+
+
 class RawDLQEvent(EventCore, EventHeaders):
     """The core GHGA-internal event info + headers and timestamp, consumed from Kafka"""
 
@@ -66,7 +70,3 @@ class StoredDLQEvent(RawDLQEvent):
 
     dlq_id: UUID4 = Field(..., description="The unique DLQS identifier for a DLQ event")
     dlq_info: DLQInfo = Field(..., description="The DLQ information for the DLQ event")
-
-
-class PublishableEventData(EventCore, EventHeaders):
-    """Only the data needed to publish an event -- core data and headers"""

@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utils for Fixture handling."""
+"""Contains functions to generate DLQ events for different topics, as well as
+helper functions and constants for testing purposes.
+"""
 
-# TODO: Update module doc string for more explanation
 from typing import Literal
 from uuid import uuid4
 
 from hexkit.providers.akafka.provider.eventsub import HeaderNames
 
-from dlqs.models import DLQInfo, PublishableEventData, RawDLQEvent, StoredDLQEvent
+from dlqs.models import DLQInfo, RawDLQEvent, StoredDLQEvent
 from tests.fixtures.config import DEFAULT_CONFIG
 
 # Service names
@@ -64,22 +65,6 @@ def dlq_to_db(event: RawDLQEvent) -> StoredDLQEvent:
         dlq_info=dlq_info,
     )
     return db_event
-
-
-def db_to_retry(event: StoredDLQEvent) -> PublishableEventData:
-    """Convert a StoredDLQEvent instance to an PublishableEventData instance.
-
-    This performs the transformation that occurs when publishing an event from
-    the database to a retry topic.
-    """
-    retry_event = PublishableEventData(
-        topic=event.dlq_info.service + "-retry",
-        type_=event.type_,
-        payload=event.payload,
-        key=event.key,
-        headers={HeaderNames.ORIGINAL_TOPIC: event.headers[HeaderNames.ORIGINAL_TOPIC]},
-    )
-    return retry_event
 
 
 def user_event(*, service: Literal["ufs", "fss"], offset: int = 0) -> RawDLQEvent:

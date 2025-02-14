@@ -43,7 +43,7 @@ async def get_dao(*, config: Config) -> EventDaoPort:
 async def get_event_publisher(
     *, config: Config
 ) -> AsyncGenerator[EventPublisherProtocol, None]:
-    """Constructs and initializes the retry publisher."""
+    """Constructs and initializes the retry-topic event publisher."""
     async with KafkaEventPublisher.construct(config=config) as publisher:
         yield publisher
 
@@ -90,7 +90,7 @@ async def prepare_rest_app(
     config: Config,
     dlq_manager_override: DLQManagerPort | None = None,
 ) -> AsyncGenerator[FastAPI, None]:
-    """Construct and initialize an REST API app along with all its dependencies.
+    """Construct and initialize a REST API app along with all its dependencies.
     By default, the core dependencies are automatically prepared but you can also
     provide them using the dlq_manager_override parameter.
     """
