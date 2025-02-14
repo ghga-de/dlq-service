@@ -31,6 +31,8 @@ async def test_get_event_success(joint_fixture: JointFixture, prepopped_events):
     assert len(stored) > 0
     expected = [loads(event.model_dump_json()) for event in stored]
 
-    response = await joint_fixture.rest_client.get(f"/{utils.UFS}/{utils.USER_EVENTS}")
+    response = await joint_fixture.rest_client.get(
+        f"/{utils.UFS}/{utils.USER_EVENTS}", headers=utils.VALID_AUTH_HEADER
+    )
     assert response.status_code == 200
     assert response.json() == expected

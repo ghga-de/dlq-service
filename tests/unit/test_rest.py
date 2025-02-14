@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
+from fastapi import status
 from ghga_service_commons.api.testing import AsyncTestClient
 
 from dlqs.adapters.inbound.fastapi_ import http_exceptions as http_exc
@@ -43,7 +44,10 @@ async def test_preview_bad_params():
         ) as app,
         AsyncTestClient(app=app) as client,
     ):
-        response = await client.get(f"/{utils.UFS}/{utils.USER_EVENTS}?skip=-1&limit=0")
+        response = await client.get(
+            f"/{utils.UFS}/{utils.USER_EVENTS}?skip=-1&limit=0",
+            headers=utils.VALID_AUTH_HEADER,
+        )
         assert response.status_code == 400
         assert response.json() == {
             "description": (
@@ -82,7 +86,9 @@ async def test_preview_error_translation(
         ) as app,
         AsyncTestClient(app=app) as client,
     ):
-        response = await client.get(f"/{utils.UFS}/{utils.USER_EVENTS}")
+        response = await client.get(
+            f"/{utils.UFS}/{utils.USER_EVENTS}", headers=utils.VALID_AUTH_HEADER
+        )
         assert response.status_code == status_code
         assert response.json()["exception_id"] == http_error.exception_id
 
@@ -126,7 +132,9 @@ async def test_process_error_translation(
         ) as app,
         AsyncTestClient(app=app) as client,
     ):
-        response = await client.post("/foo/bar", json={"dlq_id": str(TEST_UUID)})
+        response = await client.post(
+            "/foo/bar", json={"dlq_id": str(TEST_UUID)}, headers=utils.VALID_AUTH_HEADER
+        )
         assert response.status_code == status_code, str(response.json())
         assert response.json()["exception_id"] == http_error.exception_id
 
@@ -143,9 +151,38 @@ async def test_discard_error_translation():
         ) as app,
         AsyncTestClient(app=app) as client,
     ):
-        response = await client.delete(f"/{TEST_UUID}")
+        response = await client.delete(f"/{TEST_UUID}", headers=utils.VALID_AUTH_HEADER)
         assert response.status_code == 500
         assert (
             response.json()["exception_id"]
             == http_exc.HttpInternalServerError.exception_id
         )
+
+
+@pytest.mark.parametrize(
+    "auth_header",
+    [{}, utils.INVALID_AUTH_HEADER, {"Authorization": ""}],
+    ids=["no_auth", "invalid_api_key", "empty_api_key"],
+)
+async def test_401_errors(auth_header: dict[str, str]):
+    """Test that all endpoints other than /health return `401` if API key is absent."""
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=AsyncMock(),
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.get("/health", headers=auth_header)
+        assert response.status_code == 200
+
+        response = await client.get("/foo/bar", headers=auth_header)
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+        response = await client.post(
+            "/foo/bar", json={"dlq_id": str(TEST_UUID)}, headers=auth_header
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+        response = await client.delete(f"/{TEST_UUID}", headers=auth_header)
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED

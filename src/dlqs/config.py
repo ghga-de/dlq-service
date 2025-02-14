@@ -32,6 +32,12 @@ class Config(ApiConfigBase, LoggingConfig, KafkaConfig, MongoDbConfig):
     service_name: str = Field(
         default=SERVICE_NAME, description="Short name of this service"
     )
+    token_hashes: list[str] = Field(
+        default=...,
+        description="List of token hashes corresponding to the tokens that can be used "
+        + "to authenticate calls to this service. Hashes are made with SHA-256.",
+        examples=["7ad83b6b9183c91674eec897935bc154ba9ff9704f8be0840e77f476b5062b6e"],
+    )
 
 
 CONFIG = Config()  # type: ignore

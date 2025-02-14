@@ -14,11 +14,17 @@
 # limitations under the License.
 """FastAPI endpoint function definitions"""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Body, status
 from pydantic import UUID4
 
 from dlqs import models
 from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDependency
+from dlqs.adapters.inbound.fastapi_.http_authorization import (
+    TokenAuthContext,
+    require_token,
+)
 from dlqs.adapters.inbound.fastapi_.http_exceptions import (
     HttpEmptyDLQError,
     HttpInternalServerError,
@@ -61,6 +67,7 @@ async def health():
 )
 async def get_events(
     dlq_manager: DLQManagerDependency,
+    _token: Annotated[TokenAuthContext, require_token],
     service: str,
     topic: str,
     skip: int = 0,
@@ -101,6 +108,7 @@ async def process_event(  # noqa: PLR0913
     service: str,
     topic: str,
     dlq_manager: DLQManagerDependency,
+    _token: Annotated[TokenAuthContext, require_token],
     dlq_id: UUID4 = Body(..., description="The DLQ ID of the event to process."),
     override: models.EventCore | None = None,
     dry_run: bool = False,
@@ -135,7 +143,11 @@ async def process_event(  # noqa: PLR0913
     summary="Discard the event with the given DLQ ID, if it exists.",
     responses={status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"]},
 )
-async def discard_event(dlq_id: UUID4, dlq_manager: DLQManagerDependency) -> None:
+async def discard_event(
+    dlq_id: UUID4,
+    dlq_manager: DLQManagerDependency,
+    _token: Annotated[TokenAuthContext, require_token],
+) -> None:
     """Discard the event with the given DLQ ID, if it exists."""
     try:
         return await dlq_manager.discard_event(dlq_id=dlq_id)

@@ -15,6 +15,7 @@
 
 """Utils for Fixture handling."""
 
+# TODO: Update module doc string for more explanation
 from typing import Literal
 from uuid import uuid4
 
@@ -33,6 +34,8 @@ USER_EVENTS = "user-events"
 GRAPH_UPDATES = "graph-updates"
 EventLocation = Literal["dlq", "retry"]
 TEST_CID = "387a028c-a272-4086-b930-6d3e3c389d51"
+VALID_AUTH_HEADER = {"Authorization": "Bearer 43fadc91-b98f-4925-bd31-1b054b13dc55"}
+INVALID_AUTH_HEADER = {"Authorization": "Bearer 63fadc92-b98f-4926-bd30-1b054b13dc56"}
 
 
 def dlq_to_db(event: RawDLQEvent) -> StoredDLQEvent:

@@ -19,8 +19,11 @@ from typing import Annotated
 from fastapi import Depends
 from ghga_service_commons.api.di import DependencyDummy
 
+from dlqs.config import Config
 from dlqs.ports.inbound.dlq_manager import DLQManagerPort
 
+config_dummy = DependencyDummy("config_dummy")
 dlq_manager_port = DependencyDummy("dlq_manager_port")
 
+ConfigDummy = Annotated[Config, Depends(config_dummy)]
 DLQManagerDependency = Annotated[DLQManagerPort, Depends(dlq_manager_port)]
