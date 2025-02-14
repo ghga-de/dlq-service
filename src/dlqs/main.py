@@ -24,7 +24,7 @@ from ghga_service_commons.api import run_server
 from hexkit.log import configure_logging
 
 from dlqs.config import Config
-from dlqs.inject import prepare_rest_app
+from dlqs.inject import prepare_dlq_subscriber, prepare_rest_app
 
 
 async def run_rest_app():
@@ -34,3 +34,12 @@ async def run_rest_app():
 
     async with prepare_rest_app(config=config) as app:
         await run_server(app=app, config=config)
+
+
+async def consume_events(run_forever: bool = True):
+    """Run the DLQ event consumer"""
+    config = Config()  # type: ignore[call-arg]
+    configure_logging(config=config)
+
+    async with prepare_dlq_subscriber(config=config) as event_subscriber:
+        await event_subscriber.run(forever=run_forever)

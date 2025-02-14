@@ -15,7 +15,22 @@
 
 """Entrypoint of the package"""
 
-from dlqs.cli import cli
+import asyncio
 
-if __name__ == "__main__":
-    cli()
+import typer
+
+from dlqs.main import consume_events, run_rest_app
+
+cli = typer.Typer()
+
+
+@cli.command(name="run-rest")
+def sync_run_api():
+    """Run the HTTP REST API."""
+    asyncio.run(run_rest_app())
+
+
+@cli.command(name="consume-events")
+def sync_consume_events(run_forever: bool = True):
+    """Run an event consumer listening to the specified topic."""
+    asyncio.run(consume_events(run_forever=run_forever))

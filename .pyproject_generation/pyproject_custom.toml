@@ -1,6 +1,6 @@
 [project]
 name = "dlqs"
-version = "1.0.0"
+version = "0.1.0"
 description = "DLQ Service - a service to manage the dead letter queue for Kafka events"
 dependencies = [
     "typer >= 0.12",
@@ -12,4 +12,4 @@ dependencies = [
 Repository = "https://github.com/ghga-de/dlq-service"
 
 [project.scripts]
-dlqs = "dlqs.__main__:run"
+dlqs = "dlqs.__main__:cli"
