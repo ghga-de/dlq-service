@@ -52,3 +52,5 @@ async def test_bad_params():
         await aggregator.aggregate(service="test", topic="test", skip=-1, limit=10)
     with pytest.raises(ValueError):
         await aggregator.aggregate(service="test", topic="test", skip=0, limit=-1)
+    with pytest.raises(ValueError):
+        await aggregator.aggregate(service="test", topic="test", skip=0, limit=0)

@@ -66,7 +66,7 @@ class Aggregator(AggregatorPort):
         if skip < 0:
             raise ValueError(f"Skip must be 0 or greater, got {skip}")
 
-        if limit and limit < 1:
+        if limit is not None and limit < 1:
             raise ValueError(f"Limit must be greater than 0 if supplied, got {limit}")
 
         pipeline: list[dict[str, Any]] = [
