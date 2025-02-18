@@ -12,12 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-"""Used to define the location of the main FastAPI app object."""
+"""Entrypoint of the package"""
 
-from dlqs.adapters.inbound.fastapi_.configure import get_configured_app
-from dlqs.config import Config
+import asyncio
 
-config = Config()  # type: ignore
-app = get_configured_app(config=config)
+import typer
+
+from dlqs.main import consume_events, run_rest_app
+
+cli = typer.Typer()
+
+
+@cli.command(name="run-rest")
+def sync_run_api():
+    """Run the HTTP REST API."""
+    asyncio.run(run_rest_app())
+
+
+@cli.command(name="consume-events")
+def sync_consume_events(run_forever: bool = True):
+    """Run an event consumer listening to the specified topic."""
+    asyncio.run(consume_events(run_forever=run_forever))

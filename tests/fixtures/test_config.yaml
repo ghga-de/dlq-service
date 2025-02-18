@@ -1,7 +1,7 @@
 service_instance_id: "1"
 kafka_servers: ["kafka:9092"]
 mongo_dsn: mongodb://localhost:27017
-db_name: dlqs
+db_name: test
 mongo_timeout: 300
 token_hashes:
 # plaintext token: 43fadc91-b98f-4925-bd31-1b054b13dc55

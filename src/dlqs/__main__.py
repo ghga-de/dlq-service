@@ -12,12 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-"""Used to define the location of the main FastAPI app object."""
+"""Entrypoint of the package"""
 
-from dlqs.adapters.inbound.fastapi_.configure import get_configured_app
-from dlqs.config import Config
+from dlqs.cli import cli
 
-config = Config()  # type: ignore
-app = get_configured_app(config=config)
+if __name__ == "__main__":
+    cli()
