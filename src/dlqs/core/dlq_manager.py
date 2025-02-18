@@ -16,6 +16,7 @@
 """Domain logic for the DLQ Service"""
 
 import logging
+from contextlib import suppress
 from uuid import UUID, uuid4
 
 from hexkit.correlation import set_correlation_id
@@ -84,21 +85,6 @@ class DLQManager(DLQManagerPort):
         self._publisher = publisher
         self._dao = dao
         self._aggregator = aggregator
-
-    async def _delete_event(self, *, dlq_id: UUID) -> None:
-        """Delete the event with the given `dlq_id` from the database.
-
-        Raises a `DLQDeletionError` if the event could not be found.
-        The error is raised because in this service we always retrieve the event
-        before deleting it.
-        """
-        try:
-            await self._dao.delete(dlq_id)
-            log.debug("Deleted DLQ event with '%s'", dlq_id)
-        except Exception as err:
-            error = self.DLQDeletionError(dlq_id=dlq_id)
-            log.error(error)
-            raise error from err
 
     async def _get_next_event(
         self, *, service: str, topic: str
@@ -252,7 +238,7 @@ class DLQManager(DLQManagerPort):
                 await self._publisher.publish(**publish_data.model_dump())
 
             # Remove the resolved event from the database
-            await self._delete_event(dlq_id=dlq_id)
+            await self.discard_event(dlq_id=dlq_id)
         return publish_data
 
     async def discard_event(self, *, dlq_id: UUID) -> None:
@@ -265,14 +251,10 @@ class DLQManager(DLQManagerPort):
         - `DLQDeletionError` if the event exists, but could not be deleted.
         """
         try:
-            event = await self._dao.get_by_id(dlq_id)
-        except ResourceNotFoundError:
-            return None
-
-        await self._delete_event(dlq_id=dlq_id)
-        log.info(
-            "Discarded next DLQ event for %s's '%s' topic (event ID was '%s')",
-            event.dlq_info.service,
-            event.topic,
-            dlq_id,
-        )
+            with suppress(ResourceNotFoundError):
+                await self._dao.delete(dlq_id)
+                log.debug("Deleted DLQ event with ID '%s'", dlq_id)
+        except Exception as err:
+            error = self.DLQDeletionError(dlq_id=dlq_id)
+            log.error(error)
+            raise error from err

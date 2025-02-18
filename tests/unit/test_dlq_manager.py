@@ -355,7 +355,7 @@ async def test_discard_event(event_exists: bool, error: bool):
     Should cover the following cases:
     - Event exists in the DLQ for the requested service (happy path)
     - Event exists but delete fails
-    - Event does not exist in the DLQ (nothing should happen)
+    - Event does not exist in the DLQ (no errors, just quietly attempts delete)
     """
     dlq_event = utils.user_event(service="fss", offset=0)
     stored_dlq_event = stored_event_from_raw_event(dlq_event)
@@ -388,8 +388,5 @@ async def test_discard_event(event_exists: bool, error: bool):
         # The publisher should never be used for `discard_event`
         mock_publisher.publish.assert_not_called()
 
-        # Verify that we only called the DAO's "delete" method if the event existed
-        if event_exists:
-            mock_dao.delete.assert_called_once_with(dlq_id)
-        else:
-            mock_dao.delete.assert_not_called()
+        # Verify that we called the DAO's "delete" method
+        mock_dao.delete.assert_called_once_with(dlq_id)
