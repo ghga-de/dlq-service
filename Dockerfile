@@ -47,3 +47,4 @@ USER appuser
 ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["dlqs"]
+CMD ["run-rest"]

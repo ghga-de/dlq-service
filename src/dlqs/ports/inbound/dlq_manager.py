@@ -43,7 +43,7 @@ class DLQManagerPort(ABC):
         """Raised when an operation on the DLQ fails."""
 
     class DLQDeletionError(DLQOperationError):
-        """Raised when an event could not be deleted from the DLQ."""
+        """Raised when an existing event could not be deleted from the DLQ."""
 
         def __init__(self, *, dlq_id: UUID):
             msg = (
@@ -115,7 +115,7 @@ class DLQManagerPort(ABC):
         - `service`: The name of the service to preview events for.
         - `topic`: The name of the topic to preview.
         - `skip`: The number of events to skip for pagination. Default is 0.
-        - `limit`: The maximum number of events to return. Default is 0 (no limit).
+        - `limit`: The maximum number of events to return. Default is None (no limit).
 
         Raises:
         - `ValueError` if there is a problem with the params supplied to the aggregator.

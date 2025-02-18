@@ -168,7 +168,7 @@ class DLQManager(DLQManagerPort):
         - `service`: The name of the service to preview events for.
         - `topic`: The name of the topic to preview.
         - `skip`: The number of events to skip for pagination. Default is 0.
-        - `limit`: The maximum number of events to return. Default is 0 (no limit).
+        - `limit`: The maximum number of events to return. Default is None (no limit).
 
         Raises:
         - `ValueError` if there is a problem with the params supplied to the aggregator.
