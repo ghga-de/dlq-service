@@ -111,7 +111,7 @@ class DLQManager(DLQManagerPort):
         """
         try:
             events = await self._aggregator.aggregate(
-                service=service, topic=topic, skip=0, limit=1
+                service=service, topic=topic, limit=1
             )
             if events:
                 return events[0]
@@ -262,7 +262,7 @@ class DLQManager(DLQManagerPort):
         If the event doesn't exist, nothing happens.
 
         Raises:
-        - `DLQDeletionError` if the event could not be deleted.
+        - `DLQDeletionError` if the event exists, but could not be deleted.
         """
         try:
             event = await self._dao.get_by_id(dlq_id)

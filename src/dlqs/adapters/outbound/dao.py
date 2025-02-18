@@ -32,7 +32,7 @@ DLQ_EVENTS_COLLECTION = "dlqEvents"
 
 
 async def get_event_dao(*, dao_factory: DaoFactoryProtocol) -> EventDaoPort:
-    """Construct a EventDaoPort from the provided dao_factory"""
+    """Construct a DLQ Event DAO  from the provided dao_factory"""
     return await dao_factory.get_dao(
         name=DLQ_EVENTS_COLLECTION,
         dto_model=StoredDLQEvent,
@@ -72,10 +72,12 @@ class Aggregator(AggregatorPort):
         pipeline: list[dict[str, Any]] = [
             {"$match": {"dlq_info.service": service, "topic": topic}},
             {"$sort": {"timestamp": 1}},
-            {"$skip": skip},
         ]
 
-        if limit and limit > 0:
+        if skip:
+            pipeline.append({"$skip": skip})
+
+        if limit:
             pipeline.append({"$limit": limit})
 
         try:

@@ -161,6 +161,6 @@ class DLQManagerPort(ABC):
         If the event doesn't exist, nothing happens.
 
         Raises:
-        - `DLQDeletionError` if the event could not be deleted.
+        - `DLQDeletionError` if the event exists, but could not be deleted.
         """
         ...

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Body, status
 from pydantic import UUID4
 
 from dlqs import models
-from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDependency
+from dlqs.adapters.inbound.fastapi_.dummies import DLQManagerDummy
 from dlqs.adapters.inbound.fastapi_.http_authorization import (
     TokenAuthContext,
     require_token,
@@ -66,7 +66,7 @@ async def health():
     },
 )
 async def get_events(
-    dlq_manager: DLQManagerDependency,
+    dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
     service: str,
     topic: str,
@@ -107,7 +107,7 @@ async def get_events(
 async def process_event(  # noqa: PLR0913
     service: str,
     topic: str,
-    dlq_manager: DLQManagerDependency,
+    dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
     dlq_id: UUID4 = Body(..., description="The DLQ ID of the event to process."),
     override: models.EventCore | None = None,
@@ -145,7 +145,7 @@ async def process_event(  # noqa: PLR0913
 )
 async def discard_event(
     dlq_id: UUID4,
-    dlq_manager: DLQManagerDependency,
+    dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
 ) -> None:
     """Discard the event with the given DLQ ID, if it exists."""

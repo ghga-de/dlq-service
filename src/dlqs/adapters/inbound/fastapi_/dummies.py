@@ -26,4 +26,4 @@ config_dummy = DependencyDummy("config_dummy")
 dlq_manager_port = DependencyDummy("dlq_manager_port")
 
 ConfigDummy = Annotated[Config, Depends(config_dummy)]
-DLQManagerDependency = Annotated[DLQManagerPort, Depends(dlq_manager_port)]
+DLQManagerDummy = Annotated[DLQManagerPort, Depends(dlq_manager_port)]
