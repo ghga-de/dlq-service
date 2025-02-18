@@ -26,6 +26,14 @@ from tests.fixtures.prepop import ReferenceEventsDict
 pytestmark = pytest.mark.asyncio()
 
 
+async def test_agg_on_empty_db(mongodb: MongoDbFixture):
+    """Test that running the aggregator on an empty db returns an empty list."""
+    config = get_config([mongodb.config])
+    aggregator = get_aggregator(config=config)
+    results = await aggregator.aggregate(service="foo", topic="bar")
+    assert results == []
+
+
 async def test_aggregator(
     mongodb: MongoDbFixture, prepopped_events: ReferenceEventsDict
 ):

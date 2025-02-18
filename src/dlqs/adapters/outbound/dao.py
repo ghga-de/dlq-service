@@ -81,8 +81,6 @@ class Aggregator(AggregatorPort):
             pipeline.append({"$limit": limit})
 
         try:
-            if not await self._collection.find_one():
-                return []
             results = self._collection.aggregate(pipeline=pipeline)
             return [
                 document_to_dto(item, id_field="dlq_id", dto_model=StoredDLQEvent)
