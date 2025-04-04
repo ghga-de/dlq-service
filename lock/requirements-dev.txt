@@ -229,6 +229,10 @@ coverage==7.7.0 \
     --hash=sha256:f5a2f71d6a91238e7628f23538c26aa464d390cbdedf12ee2a7a0fb92a24482a \
     --hash=sha256:f81fe93dc1b8e5673f33443c0786c14b77e36f1025973b85e07c70353e46882b
     # via pytest-cov
+deprecated==1.2.18 \
+    --hash=sha256:422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d \
+    --hash=sha256:bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec
+    # via opentelemetry-api
 distlib==0.3.9 \
     --hash=sha256:47f8c22fd27c27e25a65601af709b38e4f0a45ea4fc2e710f65755fa8caaaf87 \
     --hash=sha256:a60f20dea646b8a33f3e7772f74dc0b2d0772d2837ee1342a00645c81edf9403
@@ -259,9 +263,9 @@ h11==0.14.0 \
     # via
     #   httpcore
     #   uvicorn
-hexkit==4.1.1 \
-    --hash=sha256:b451dd398050069fccfa0108d86ef5c85b8c81b8f4e545a9a64a64995e6e2bc1 \
-    --hash=sha256:eee526a5f24fe1aa8e21bd0a37757e924bad307a8e9d8948f9a5f852cea8cc28
+hexkit==4.3.1 \
+    --hash=sha256:b1f608978940d2e10bc476fb121eac0cc86bd3cd080061216fb748ce122d1a84 \
+    --hash=sha256:edda094e24978b54d9629d0fbe963a885e48bb6cbc59f15d86749e68a6288634
     # via
     #   dlqs (pyproject.toml)
     #   ghga-service-commons
@@ -332,6 +336,10 @@ idna==3.10 \
     #   anyio
     #   httpx
     #   requests
+importlib-metadata==8.6.1 \
+    --hash=sha256:02a89390c1e15fdfdc0d7c6b25cb3e62650d0494005c97d6f148bf5b9787525e \
+    --hash=sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580
+    # via opentelemetry-api
 iniconfig==2.1.0 \
     --hash=sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7 \
     --hash=sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760
@@ -408,6 +416,10 @@ nodeenv==1.9.1 \
     --hash=sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f \
     --hash=sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9
     # via pre-commit
+opentelemetry-api==1.31.1 \
+    --hash=sha256:137ad4b64215f02b3000a0292e077641c8611aab636414632a9b9068593b7e91 \
+    --hash=sha256:1511a3f470c9c8a32eeea68d4ea37835880c0eed09dd1a0187acc8b1301da0a1
+    # via hexkit
 packaging==24.2 \
     --hash=sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759 \
     --hash=sha256:c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f
@@ -1194,4 +1206,10 @@ wrapt==1.17.2 \
     --hash=sha256:f917c1180fdb8623c2b75a99192f4025e412597c50b2ac870f156de8fb101119 \
     --hash=sha256:fc78a84e2dfbc27afe4b2bd7c80c8db9bca75cc5b85df52bfe634596a1da846b \
     --hash=sha256:ff04ef6eec3eee8a5efef2401495967a916feaa353643defcc03fc74fe213b58
-    # via testcontainers
+    # via
+    #   deprecated
+    #   testcontainers
+zipp==3.21.0 \
+    --hash=sha256:2c9958f6430a2040341a52eb608ed6dd93ef4392e02ffe219417c1b28b5dd1f4 \
+    --hash=sha256:ac1bbe05fd2991f160ebce24ffbac5f6d11d83dc90891255885223d42b3cd931
+    # via importlib-metadata
