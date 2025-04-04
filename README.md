@@ -21,15 +21,15 @@ configuration and create a dedicated Kafka consumer for each DLQ topic.
 
 We recommend using the provided Docker container.
 
-A pre-build version is available at [docker hub](https://hub.docker.com/repository/docker/ghga/dlq-service):
+A pre-built version is available at [docker hub](https://hub.docker.com/repository/docker/ghga/dlq-service):
 ```bash
-docker pull ghga/dlq-service:1.0.0
+docker pull ghga/dlq-service:1.0.1
 ```
 
 Or you can build the container yourself from the [`./Dockerfile`](./Dockerfile):
 ```bash
 # Execute in the repo's root dir:
-docker build -t ghga/dlq-service:1.0.0 .
+docker build -t ghga/dlq-service:1.0.1 .
 ```
 
 For production-ready deployment, we recommend using Kubernetes, however,
@@ -37,7 +37,7 @@ for simple use cases, you could execute the service using docker
 on a single server:
 ```bash
 # The entrypoint is preconfigured:
-docker run -p 8080:8080 ghga/dlq-service:1.0.0 --help
+docker run -p 8080:8080 ghga/dlq-service:1.0.1 --help
 ```
 
 If you prefer not to use containers, you may install the service from source:
@@ -383,11 +383,11 @@ The service requires the following configuration parameters:
 
 ### Usage:
 
-A template YAML for configurating the service can be found at
+A template YAML for configuring the service can be found at
 [`./example-config.yaml`](./example-config.yaml).
-Please adapt it, rename it to `.dlqs.yaml`, and place it into one of the following locations:
-- in the current working directory were you are execute the service (on unix: `./.dlqs.yaml`)
-- in your home directory (on unix: `~/.dlqs.yaml`)
+Please adapt it, rename it to `.dlqs.yaml`, and place it in one of the following locations:
+- in the current working directory where you execute the service (on Linux: `./.dlqs.yaml`)
+- in your home directory (on Linux: `~/.dlqs.yaml`)
 
 The config yaml will be automatically parsed by the service.
 
@@ -401,7 +401,7 @@ e.g. for the `host` set an environment variable named `dlqs_host`
 (you may use both upper or lower cases, however, it is standard to define all env
 variables in upper cases).
 
-To using file secrets please refer to the
+To use file secrets, please refer to the
 [corresponding section](https://pydantic-docs.helpmanual.io/usage/settings/#secret-support)
 of the pydantic documentation.
 
@@ -445,8 +445,8 @@ This will give you a full-fledged, pre-configured development environment includ
 - a pre-configured debugger
 - automatic license-header insertion
 
-Moreover, inside the devcontainer, a convenience commands `dev_install` is available.
-It installs the service with all development dependencies, installs pre-commit.
+Moreover, inside the devcontainer, a command `dev_install` is available for convenience.
+It installs the service with all development dependencies, and it installs pre-commit.
 
 The installation is performed automatically when you build the devcontainer. However,
 if you update dependencies in the [`./pyproject.toml`](./pyproject.toml) or the
