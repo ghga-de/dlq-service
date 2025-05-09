@@ -117,7 +117,7 @@ class DLQManager(DLQManagerPort):
 
         Raises a `ValueError` if any of the above conditions are not met.
         """
-        # Published event can't have DLQ or '-retry' in the topic
+        # Original topic for inbound event shouldn't be DLQ topic or a retry topic
         if (
             event.topic.startswith("retry-")
             or event.topic == self._config.kafka_dlq_topic
