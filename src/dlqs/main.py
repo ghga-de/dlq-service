@@ -36,7 +36,7 @@ async def run_rest_app():
     config = Config()  # type: ignore [call-arg]
     configure_logging(config=config)
 
-    if config.kafka_max_message_size < 16000000:
+    if config.kafka_max_message_size < 16_000_000:
         log.warning(
             "Kafka max message size is set to less than 16 MB. "
             "This may lead to issues with large DLQ events.",
