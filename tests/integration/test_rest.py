@@ -88,7 +88,7 @@ async def test_msg_too_big_to_publish(
         AsyncTestClient(app=app) as client,
     ):
         # clear stderr/out buffers
-        out, err = capsys.readouterr()
+        _, _ = capsys.readouterr()
         response = await client.post(
             "/test-service/test-topic",
             json={"dlq_id": str(test_event.dlq_id)},
