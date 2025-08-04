@@ -28,22 +28,18 @@ components:
           description: The exception message that was raised.
           title: Exc Msg
           type: string
-        offset:
-          description: The offset of the event.
-          title: Offset
-          type: integer
-        partition:
-          description: The partition of the event.
-          title: Partition
-          type: integer
+        original_event_id:
+          description: The original event_id value
+          format: uuid4
+          title: Original Event Id
+          type: string
         service:
           description: The name of the service that failed to process the event.
           title: Service
           type: string
       required:
       - service
-      - partition
-      - offset
+      - original_event_id
       title: DLQInfo
       type: object
     EventCore:
@@ -246,7 +242,7 @@ components:
       description: Model representing a DLQ event as it exists in the database
       properties:
         dlq_id:
-          description: The unique DLQS identifier for a DLQ event
+          description: The ID of the event.
           format: uuid4
           title: Dlq Id
           type: string
