@@ -29,7 +29,7 @@ from tests.fixtures.config import get_config
 pytestmark = pytest.mark.asyncio()
 
 
-async def test_v2_migration(mongodb: MongoDbFixture, monkeypatch):
+async def test_v2_migration(mongodb: MongoDbFixture):
     """Test the forward and reverse migration for v2"""
     config = get_config(sources=[mongodb.config])
 
@@ -39,7 +39,6 @@ async def test_v2_migration(mongodb: MongoDbFixture, monkeypatch):
     timestamp = datetime(2025, 6, 1, 17, 4, 8, 484738, tzinfo=UTC)
     timestamp_migrated = timestamp.replace(microsecond=485000)
     cid = str(uuid4())
-    og_event_id = uuid4()
 
     event: dict[str, Any] = {
         "_id": None,
@@ -73,7 +72,7 @@ async def test_v2_migration(mongodb: MongoDbFixture, monkeypatch):
         del migrated_event["dlq_info"]["partition"]
         del migrated_event["dlq_info"]["offset"]
         migrated_event["_id"] = UUID(old_event["_id"])
-        migrated_event["dlq_info"]["original_event_id"] = og_event_id
+        migrated_event["dlq_info"]["original_event_id"] = None
         migrated_event["timestamp"] = timestamp_migrated
         expected_migrated_events.append(migrated_event)
 
@@ -87,10 +86,7 @@ async def test_v2_migration(mongodb: MongoDbFixture, monkeypatch):
     expected_migrated_events.sort(key=lambda x: str(x.get("_id")))
     expected_reverted_events.sort(key=lambda x: x["_id"])
 
-    # Run the migration with the random original_event_id rigged to our test value
-    with monkeypatch.context() as m:
-        m.setattr("dlqs.migrations.definitions.uuid4", lambda: og_event_id)
-        await run_db_migrations(config=config, target_version=2)
+    await run_db_migrations(config=config, target_version=2)
 
     # Retrieve migrated data and evaluate
     migrated_events = collection.find({}).to_list()

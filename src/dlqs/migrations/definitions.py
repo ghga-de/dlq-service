@@ -15,8 +15,6 @@
 
 """Database migration logic for NOS"""
 
-from uuid import uuid4
-
 from hexkit.providers.mongodb.migrations import (
     Document,
     MigrationDefinition,
@@ -34,7 +32,7 @@ class V2Migration(MigrationDefinition, Reversible):
     to new event structure:
     - convert _id to UUID
     - convert timestamp to datetime
-    - populate dlq_info.original_event_id with random UUID
+    - populate dlq_info.original_event_id with None
     - delete dlq_info.partition and offset
 
     This cannot be fully reversed as some data is permanently lost (offset, partition).
@@ -53,7 +51,7 @@ class V2Migration(MigrationDefinition, Reversible):
             doc = await convert_field_types(doc)
             del doc["dlq_info"]["partition"]
             del doc["dlq_info"]["offset"]
-            doc["dlq_info"]["original_event_id"] = uuid4()
+            doc["dlq_info"]["original_event_id"] = None
             return doc
 
         async with self.auto_finalize(DLQ_EVENTS_COLLECTION, copy_indexes=True):

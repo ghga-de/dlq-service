@@ -49,7 +49,17 @@ def stored_event_from_raw_event(event: RawDLQEvent) -> StoredDLQEvent:
     # TODO Add logic for processing old events and log where needed
     og_topic = event.headers[HeaderNames.ORIGINAL_TOPIC]
     service = event.headers.get(HeaderNames.SERVICE_NAME, "")
-    og_event_id = UUID(event.headers.get(HeaderNames.ORIGINAL_EVENT_ID))
+
+    og_event_id = (
+        UUID(event.headers.get(HeaderNames.ORIGINAL_EVENT_ID))
+        if HeaderNames.ORIGINAL_EVENT_ID in event.headers
+        else None
+    )
+    if not og_event_id:
+        log.info(
+            "DLQ Event %s did not arrive with an existing 'original_event_id'",
+            event.dlq_id,
+        )
     exc_class = event.headers.get(HeaderNames.EXC_CLASS, "")
     exc_msg = event.headers.get(HeaderNames.EXC_MSG, "")
     dlq_info = DLQInfo(
@@ -135,11 +145,12 @@ class DLQManager(DLQManagerPort):
         try:
             await self._dao.insert(stored_event)
         except Exception as err:
+            already_exists = isinstance(err, ResourceAlreadyExistsError)
             error = self.DLQInsertionError(
                 dlq_id=stored_event.dlq_id,
-                already_exists=isinstance(err, ResourceAlreadyExistsError),
+                already_exists=already_exists,
             )
-            log.error(error)
+            log.error(error, exc_info=not already_exists)  # log TB if misc
             raise error from err
 
     async def preview_events(

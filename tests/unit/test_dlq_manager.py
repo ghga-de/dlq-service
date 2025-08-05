@@ -100,6 +100,15 @@ def test_stored_event_from_dlq_event_info():
     assert isinstance(stored_dlq_event, StoredDLQEvent)
 
 
+def test_stored_event_from_dlq_event_legacy():
+    """Test that we can handle events published pre-hexkit-v6 (replay, for example)"""
+    dlq_event = utils.graph_event()
+    del dlq_event.headers[HeaderNames.ORIGINAL_EVENT_ID]
+    dlq_event.headers["event_id"] = "fss,topic,0,123"
+    stored_dlq_event = stored_event_from_raw_event(dlq_event)
+    assert stored_dlq_event.dlq_info.original_event_id is None
+
+
 @pytest.mark.asyncio
 async def test_process_override_different_dlq_id():
     """Verify that the DLQManager stops processing with a DLQValidationError

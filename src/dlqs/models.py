@@ -64,7 +64,9 @@ class DLQInfo(BaseModel):
     service: str = Field(
         ..., description="The name of the service that failed to process the event."
     )
-    original_event_id: UUID4 = Field(..., description="The original event_id value")
+    original_event_id: UUID4 | None = Field(
+        None, description="The original event_id value"
+    )
     exc_class: str = Field("", description="The exception class that was raised.")
     exc_msg: str = Field("", description="The exception message that was raised.")
 
