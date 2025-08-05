@@ -46,7 +46,6 @@ def stored_event_from_raw_event(event: RawDLQEvent) -> StoredDLQEvent:
     The new event ID is used as the DLQ ID, and the old event ID is stored in DLQInfo.
     """
     # Extract the DLQ info from the headers
-    # TODO Add logic for processing old events and log where needed
     og_topic = event.headers[HeaderNames.ORIGINAL_TOPIC]
     service = event.headers.get(HeaderNames.SERVICE_NAME, "")
 
