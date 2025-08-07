@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Database migration logic for NOS"""
+"""Database migration logic for DLQS"""
 
 from hexkit.providers.mongodb.migrations import (
     Document,
