@@ -340,7 +340,6 @@ paths:
         name: dlq_id
         required: true
         schema:
-          format: uuid4
           title: Dlq Id
           type: string
       responses:

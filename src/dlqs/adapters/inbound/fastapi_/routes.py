@@ -16,6 +16,7 @@
 
 import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Body, status
 from pydantic import UUID4
@@ -170,13 +171,19 @@ async def process_event(  # noqa: PLR0913
     responses={status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"]},
 )
 async def discard_event(
-    dlq_id: UUID4,
+    dlq_id: str,
     dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
 ) -> None:
     """Discard the event with the given DLQ ID, if it exists."""
     try:
-        return await dlq_manager.discard_event(dlq_id=dlq_id)
+        _dlq_id = UUID(dlq_id)
+    except ValueError:
+        log.debug("Invalid arg received for dlq_id: %s", dlq_id)
+        return
+
+    try:
+        return await dlq_manager.discard_event(dlq_id=_dlq_id)
     except Exception as exc:
         # lump all other errors here
         log.error(

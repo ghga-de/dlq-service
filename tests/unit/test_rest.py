@@ -186,3 +186,16 @@ async def test_401_errors(auth_header: dict[str, str]):
 
         response = await client.delete(f"/{TEST_UUID}", headers=auth_header)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+async def test_delete_invalid_dlq_id():
+    """Test that invalid DLQ ID path arg in DELETE endpoint raises no error"""
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=AsyncMock(),
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.delete("/bad-id", headers=utils.VALID_AUTH_HEADER)
+        assert response.status_code == 204
