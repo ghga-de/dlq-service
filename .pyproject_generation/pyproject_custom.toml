@@ -1,11 +1,11 @@
 [project]
 name = "dlqs"
-version = "3.0.2"
+version = "3.1.0"
 description = "DLQ Service - a service to manage the dead letter queue for Kafka events"
 dependencies = [
     "typer >= 0.19",
-    "ghga-service-commons[api] >= 5.1",
-    "hexkit[akafka,mongodb] >= 7.1",
+    "ghga-service-commons[api] >= 7.0",
+    "hexkit[akafka,mongodb] >= 8.0",
 ]
 
 [project.urls]
