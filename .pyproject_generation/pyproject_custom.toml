@@ -1,6 +1,6 @@
 [project]
 name = "dlqs"
-version = "3.1.0"
+version = "3.1.1"
 description = "DLQ Service - a service to manage the dead letter queue for Kafka events"
 dependencies = [
     "typer >= 0.19",
