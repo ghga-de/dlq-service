@@ -49,7 +49,7 @@ COPY --from=dep-builder /opt/runtime-bin/ /usr/local/bin/
 # Base image already runs as non-root (65532), but we use 1000 to be consistent
 USER 1000
 
-COPY --from=dep-builder /usr/bin/dlqs /usr/local/bin/my-microservice
+COPY --from=dep-builder /usr/bin/dlqs /usr/local/bin/dlqs
 
 ENV PYTHONUNBUFFERED=1
 
