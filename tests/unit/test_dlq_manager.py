@@ -16,10 +16,12 @@
 """Unit tests for the DLQ Manager"""
 
 from contextlib import nullcontext
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID
 
 import pytest
+from hexkit.protocols.dao import Dao
 from hexkit.providers.akafka.provider.eventsub import HeaderNames
 from hexkit.providers.testing.dao import new_mock_dao_class
 
@@ -130,7 +132,7 @@ async def test_process_override_different_dlq_id():
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=dao,
+        dao_override=dao,  # type: ignore[arg-type]
         publisher_override=AsyncMock(),
     ) as dlq_manager:
         with pytest.raises(dlq_manager.DLQSequenceError):
@@ -163,7 +165,7 @@ async def test_process_override_forbidden_topic(topic: str):
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=dao,
+        dao_override=dao,  # type: ignore[arg-type]
         publisher_override=AsyncMock(),
     ) as dlq_manager:
         with pytest.raises(dlq_manager.DLQValidationError):
@@ -189,7 +191,7 @@ async def test_process_dry_run():
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=dao,
+        dao_override=dao,  # type: ignore[arg-type]
         publisher_override=mock_publisher,
     ) as dlq_manager:
         await dlq_manager.process_event(
@@ -236,7 +238,7 @@ async def test_process_override_success():
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=dao,
+        dao_override=dao,  # type: ignore[arg-type]
         publisher_override=mock_publisher,
     ) as dlq_manager:
         result = await dlq_manager.process_event(
@@ -275,13 +277,13 @@ async def test_process_with_empty_dlq(override: EventCore | None):
     async def ensure_delete_not_hit(id_) -> None:
         raise RuntimeError("Delete was called on the DAO but shouldn't have been.")
 
-    mock_dao.delete = ensure_delete_not_hit
+    mock_dao.delete = ensure_delete_not_hit  # type: ignore
     mock_publisher = AsyncMock()
     dlq_id = TEST_UUID
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=mock_dao,
+        dao_override=mock_dao,  # type: ignore[arg-type]
         publisher_override=mock_publisher,
     ) as dlq_manager:
         with pytest.raises(dlq_manager.DLQEmptyError):
@@ -341,7 +343,7 @@ async def test_value_error_propagation(skip: int, limit: int):
 
     async with prepare_core(
         config=DEFAULT_CONFIG,
-        dao_override=dao,
+        dao_override=dao,  # type: ignore[arg-type]
         publisher_override=AsyncMock(),
     ) as dlq_manager:
         with pytest.raises(DLQManagerPort.DLQPaginationError):
@@ -415,7 +417,7 @@ async def test_discard_event(event_exists: bool, error: bool):
 @pytest.mark.asyncio
 async def test_fetch_services_and_topics():
     """Test to make sure `fetch_services_and_topics()` returns the right data."""
-    dao = InMemDLQEventDao()
+    dao = cast(Dao[StoredDLQEvent], InMemDLQEventDao())
 
     for i in range(5):
         dlq_event = utils.user_event(service="fss", user_no=i)
