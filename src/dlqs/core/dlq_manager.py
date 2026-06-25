@@ -198,7 +198,7 @@ class DLQManager(DLQManagerPort):
         - `DLQPreviewError` if the preview fails for any other reason.
         """
         try:
-            events = [
+            return [
                 x
                 async for x in self._dao.find_all(
                     mapping={"dlq_info.service": service, "topic": topic},
@@ -213,8 +213,6 @@ class DLQManager(DLQManagerPort):
             error = self.DLQPreviewError(service=service, topic=topic)
             log.error(error)
             raise error from err
-
-        return [StoredDLQEvent(**event.model_dump()) for event in events]
 
     async def process_event(
         self,
