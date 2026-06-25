@@ -203,7 +203,7 @@ async def test_process_dry_run():
         )
         # Verify that the event was neither published nor deleted from the DLQ
         assert dao.latest == stored_dlq_event
-        mock_publisher.publish_event.assert_not_called()
+        mock_publisher.publish.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -294,7 +294,7 @@ async def test_process_with_empty_dlq(override: EventCore | None):
                 override=override,
                 dry_run=False,
             )
-        mock_publisher.send_to_retry_topic.assert_not_called()
+        mock_publisher.publish.assert_not_called()
 
 
 @pytest.mark.parametrize(
