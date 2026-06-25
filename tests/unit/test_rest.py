@@ -186,3 +186,65 @@ async def test_401_errors(auth_header: dict[str, str]):
 
         response = await client.delete(f"/{TEST_UUID}", headers=auth_header)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+async def test_summary_happy():
+    """Test that the summary endpoint calls the right endpoint and returns the data."""
+    core_result = {
+        utils.FSS: {
+            utils.USER_EVENTS: 5,
+            utils.GRAPH_UPDATES: 19,
+        },
+        utils.UFS: {utils.USER_EVENTS: 4},
+    }
+
+    dlq_manager_mock = AsyncMock()
+    dlq_manager_mock.get_service_topic_summary.return_value = core_result
+
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=dlq_manager_mock,
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.get("/summary", headers=utils.VALID_AUTH_HEADER)
+        assert response.status_code == 200
+        assert response.json() == core_result
+
+
+@pytest.mark.parametrize(
+    "auth_header",
+    [{}, utils.INVALID_AUTH_HEADER, {"Authorization": ""}],
+    ids=["no_auth", "invalid_api_key", "empty_api_key"],
+)
+async def test_summary_auth_errors(auth_header: dict[str, str]):
+    """Test that the summary endpoint's auth is set up correctly."""
+    dlq_manager_mock = AsyncMock()
+
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=dlq_manager_mock,
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.get("/summary", headers=auth_header)
+        assert response.status_code == 401
+
+
+async def test_summary_core_error():
+    """Test that uncaught exceptions in the core are caught at the API layer."""
+    dlq_manager_mock = AsyncMock()
+    dlq_manager_mock.get_service_topic_summary.side_effect = RuntimeError("Test error")
+
+    async with (
+        prepare_rest_app(
+            config=DEFAULT_CONFIG,
+            dlq_manager_override=dlq_manager_mock,
+        ) as app,
+        AsyncTestClient(app=app) as client,
+    ):
+        response = await client.get("/summary", headers=utils.VALID_AUTH_HEADER)
+        assert response.status_code == 500
+        assert response.json()["exception_id"] == "internalServerError"

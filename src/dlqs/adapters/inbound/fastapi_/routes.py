@@ -59,13 +59,13 @@ async def health():
 
 
 @router.get(
-    "/summarize",
+    "/summary",
     summary="Return a summary of the current DLQ state by service and topic",
     status_code=status.HTTP_200_OK,
     response_model=dict[str, dict[str, int]],
     responses={status.HTTP_500_INTERNAL_SERVER_ERROR: RESPONSES["internalServerError"]},
 )
-async def summarize(
+async def get_summary(
     dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
 ):

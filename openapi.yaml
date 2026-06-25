@@ -336,10 +336,10 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
-  /summarize:
+  /summary:
     get:
       description: Return a summary of the current DLQ state by service and topic.
-      operationId: summarize_summarize_get
+      operationId: get_summary_summary_get
       responses:
         '200':
           content:
@@ -349,7 +349,7 @@ paths:
                   additionalProperties:
                     type: integer
                   type: object
-                title: Response Summarize Summarize Get
+                title: Response Get Summary Summary Get
                 type: object
           description: Successful Response
         '500':

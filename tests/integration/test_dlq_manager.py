@@ -131,6 +131,7 @@ async def test_preview(joint_fixture: JointFixture, prepopped_events):
     )
     assert notifications_preview2 == notifications_preview
 
+
 async def test_preview_with_various_skip_and_limit_args(
     joint_fixture: JointFixture, prepopped_events: ReferenceEventsDict
 ):
