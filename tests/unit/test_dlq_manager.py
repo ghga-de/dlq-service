@@ -335,7 +335,7 @@ async def test_preview_pagination_valid_params(skip: int, limit: int):
         )
 
 
-@pytest.mark.parametrize("skip, limit", [(-1, 10), (0, -1), (-1, -1)])
+@pytest.mark.parametrize("skip, limit", [(-1, 10), (0, -1), (-1, -1), (0, 0)])
 @pytest.mark.asyncio
 async def test_value_error_propagation(skip: int, limit: int):
     """Verify that `preview_events` lets ValueErrors bubble up."""
@@ -386,17 +386,13 @@ async def test_discard_event(event_exists: bool, error: bool):
 
     mock_dao = AsyncMock()
 
-    # To simulate an existing event, we return it from the mock (otherwise raise an error)
-    if event_exists:
-        mock_dao.get_by_id.return_value = stored_dlq_event
-    else:
-        mock_dao.get_by_id.side_effect = ResourceNotFoundError(id_=dlq_id)
-
     # If we want to simulate a deletion error, we raise an exception on the mock
     if error:
         mock_dao.delete.side_effect = DLQManagerPort.DLQDeletionError(
             dlq_id=stored_dlq_event.dlq_id
         )
+    elif not event_exists:
+        mock_dao.delete.side_effect = ResourceNotFoundError(id_=dlq_id)
     mock_publisher = AsyncMock()
 
     async with prepare_core(
