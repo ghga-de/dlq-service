@@ -106,7 +106,7 @@ class DLQManagerPort(ABC):
         """
 
     @abstractmethod
-    async def fetch_services_and_topics(self) -> dict[str, dict[str, int]]:
+    async def get_service_topic_summary(self) -> dict[str, dict[str, int]]:
         """Returns a dictionary containing an overview of the contents of the DLQS
         for operational convenience. The dict's keys are the available services, and the
         values are another dict containing the number of DLQ events for each topic.

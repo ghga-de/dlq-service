@@ -415,8 +415,8 @@ async def test_discard_event(event_exists: bool, error: bool):
 
 
 @pytest.mark.asyncio
-async def test_fetch_services_and_topics():
-    """Test to make sure `fetch_services_and_topics()` returns the right data."""
+async def test_get_service_topic_summary():
+    """Test to make sure `get_service_topic_summary()` returns the right data."""
     dao = cast(Dao[StoredDLQEvent], InMemDLQEventDao())
 
     for i in range(5):
@@ -436,7 +436,7 @@ async def test_fetch_services_and_topics():
         dao_override=dao,
         publisher_override=AsyncMock(),
     ) as dlq_manager:
-        results = await dlq_manager.fetch_services_and_topics()
+        results = await dlq_manager.get_service_topic_summary()
     assert results == {
         utils.FSS: {
             utils.USER_EVENTS: 5,

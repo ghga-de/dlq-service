@@ -336,6 +336,31 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
+  /summarize:
+    get:
+      description: Return a summary of the current DLQ state by service and topic.
+      operationId: summarize_summarize_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  additionalProperties:
+                    type: integer
+                  type: object
+                title: Response Summarize Summarize Get
+                type: object
+          description: Successful Response
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpInternalServerError'
+          description: Internal Server Error
+      security:
+      - HTTPBearer: []
+      summary: Return a summary of the current DLQ state by service and topic
   /{dlq_id}:
     delete:
       description: Discard the event with the given DLQ ID, if it exists.

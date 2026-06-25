@@ -30,7 +30,7 @@ from dlqs.ports.inbound.dlq_manager import DLQManagerPort
             DLQManager,
             [
                 "store_event",
-                "fetch_services_and_topics",
+                "get_service_topic_summary",
                 "preview_events",
                 "process_event",
                 "discard_event",
