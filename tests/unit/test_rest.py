@@ -34,9 +34,9 @@ TEST_UUID2 = UUID("f4e0fbd6-016a-488e-9051-aefaa70689e1")
 
 
 async def test_preview_bad_params():
-    """Test how ValueError is translated (from bad `skip` or `limit` args)"""
+    """Test how DLQPaginationError is translated (from bad `skip` or `limit` args)"""
     dlq_manager = AsyncMock()
-    dlq_manager.preview_events.side_effect = ValueError("bad params")
+    dlq_manager.preview_events.side_effect = DLQManagerPort.DLQPaginationError()
     async with (
         prepare_rest_app(
             config=DEFAULT_CONFIG,
@@ -63,7 +63,7 @@ async def test_preview_bad_params():
     "internal_error, http_error, status_code",
     [
         (
-            ValueError(),
+            DLQManagerPort.DLQPaginationError(),
             http_exc.HttpPreviewParamsError,
             400,
         ),

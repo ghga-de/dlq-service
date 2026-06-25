@@ -84,7 +84,7 @@ async def get_events(
         return await dlq_manager.preview_events(
             service=service, topic=topic, limit=limit, skip=skip
         )
-    except ValueError as err:
+    except DLQManagerPort.DLQPaginationError as err:
         raise HttpPreviewParamsError(skip=skip, limit=limit) from err
     except Exception as exc:
         # DLQPreviewError and all others get caught here
