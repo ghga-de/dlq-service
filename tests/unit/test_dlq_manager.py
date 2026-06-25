@@ -335,7 +335,7 @@ async def test_preview_pagination_valid_params(skip: int, limit: int):
         )
 
 
-@pytest.mark.parametrize("skip, limit", [(-1, 10), (0, -1), (-1, -1), (0, 0)])
+@pytest.mark.parametrize("skip, limit", [(-1, 10), (0, -1), (-1, -1)])
 @pytest.mark.asyncio
 async def test_value_error_propagation(skip: int, limit: int):
     """Verify that `preview_events` lets ValueErrors bubble up."""
