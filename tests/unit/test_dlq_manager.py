@@ -355,7 +355,7 @@ async def test_value_error_propagation(skip: int, limit: int):
 @pytest.mark.asyncio
 async def test_preview_db_error():
     """Test that non-pagination errors are translated as DLQPreviewError"""
-    error_mock = AsyncMock()
+    error_mock = Mock()
     error_mock.find_all.side_effect = TypeError()
     async with prepare_core(
         config=DEFAULT_CONFIG,
