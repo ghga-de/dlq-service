@@ -15,6 +15,7 @@
 """DLQ Manager Port definition"""
 
 from abc import ABC, abstractmethod
+from collections import Counter
 from uuid import UUID
 
 from dlqs.models import EventCore, PublishableEventData, RawDLQEvent, StoredDLQEvent
@@ -106,7 +107,7 @@ class DLQManagerPort(ABC):
         """
 
     @abstractmethod
-    async def get_service_topic_summary(self) -> dict[str, dict[str, int]]:
+    async def get_service_topic_summary(self) -> dict[str, Counter[str]]:
         """Returns a dictionary containing an overview of the contents of the DLQS
         for operational convenience. The dict's keys are the available services, and the
         values are another dict containing the number of DLQ events for each topic.

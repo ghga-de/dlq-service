@@ -16,7 +16,7 @@
 """Domain logic for the DLQ Service"""
 
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import suppress
 from uuid import UUID
 
@@ -156,7 +156,7 @@ class DLQManager(DLQManagerPort):
             log.error(error, exc_info=not already_exists)  # log TB if misc
             raise error from err
 
-    async def get_service_topic_summary(self) -> dict[str, dict[str, int]]:
+    async def get_service_topic_summary(self) -> dict[str, Counter[str]]:
         """Returns a dictionary containing an overview of the contents of the DLQS
         for operational convenience. The dict's keys are the available services, and the
         values are another dict containing the number of DLQ events for each topic.
@@ -169,9 +169,10 @@ class DLQManager(DLQManagerPort):
         }
         ```
         """
-        service_topics: dict[str, dict[str, int]] = defaultdict(
-            lambda: defaultdict(lambda: 0)
-        )
+        service_topics: dict[str, Counter[str]] = defaultdict(Counter)
+
+        # TODO: Here we pull back everything just to get a couple fields - this is a
+        # limitation of hexkit and is costly/inefficient. Should optimize in the future.
         results_iter = self._dao.find_all(mapping={})
         async for event in results_iter:
             service_topics[event.dlq_info.service][event.topic] += 1

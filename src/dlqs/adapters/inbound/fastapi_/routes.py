@@ -15,6 +15,7 @@
 """FastAPI endpoint function definitions"""
 
 import logging
+from collections import Counter
 from typing import Annotated
 
 from fastapi import APIRouter, Body, status
@@ -68,7 +69,7 @@ async def health():
 async def get_summary(
     dlq_manager: DLQManagerDummy,
     _token: Annotated[TokenAuthContext, require_token],
-) -> dict[str, dict[str, int]]:
+) -> dict[str, Counter[str]]:
     """Return a summary of the current DLQ state by service and topic."""
     try:
         return await dlq_manager.get_service_topic_summary()
